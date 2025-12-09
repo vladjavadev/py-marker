@@ -7,17 +7,21 @@ import time
 start = time.time()
 # Завантажуємо фото з маркером
 frame = cv2.imread("img/image2.png")
+frame = cv2.resize(frame, (640, 480))
+
 
 # Словник маркерів
 dictionary = aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
 
 # Детекція маркерів
-corners, ids, rejected = aruco.detectMarkers(frame, dictionary)
+gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+corners, ids, rejected = aruco.detectMarkers(gray, dictionary)
 
 # Параметри камери (треба калібрувати для точності!)
 # Тут приклад з умовними значеннями
-camera_matrix = np.array([[1000, 0, frame.shape[1]/2],
-                          [0, 1000, frame.shape[0]/2],
+camera_matrix = np.array([[1000, 0, gray.shape[1]/2],
+                          [0, 1000, gray.shape[0]/2],
                           [0, 0, 1]], dtype=np.float32)
 dist_coeffs = np.zeros((5,1))  # якщо немає калібрування
 
@@ -32,7 +36,7 @@ if ids is not None:
         # Малюємо координатні осі
         cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvecs[i], tvecs[i], 0.05)
 
-cv2.imshow("Pose Estimation", frame)
+cv2.imwrite("pose_result.png", frame)
 print("Time: ",time.time()-start)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
