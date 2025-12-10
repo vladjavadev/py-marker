@@ -6,12 +6,12 @@ import time
 
 start = time.time()
 # Завантажуємо фото з маркером
-frame = cv2.imread("img/image3.png")
-frame = cv2.resize(frame, (320, 240))
+frame = cv2.imread("img/image4.png")
+# frame = cv2.resize(frame, (320, 240))
 
 
 # Словник маркерів
-dictionary = aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
+dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
 # Детекція маркерів
 # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -35,6 +35,16 @@ if ids is not None:
 
         # Малюємо координатні осі
         cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvecs[i], tvecs[i], 0.05)
+    for rvec in rvecs:
+        R, _ = cv2.Rodrigues(rvec)
+
+        print("Rotation matrix:\n", R)
+
+        # Применим к точке в системе маркера
+        point_marker = np.array([0, 0, 1])  # точка на оси Z маркера
+        point_camera = R @ point_marker
+        print("Point in camera coords:", point_camera)
+
 
 cv2.imwrite("img/pose_result.png", frame)
 print("Time: ",time.time()-start)
