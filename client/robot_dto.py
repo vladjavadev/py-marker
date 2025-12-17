@@ -1,4 +1,4 @@
-from client.marker import Marker
+from marker import Marker
 
 class DeltaPos:
     def __init__(self):

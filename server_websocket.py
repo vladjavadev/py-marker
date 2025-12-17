@@ -6,63 +6,117 @@ import asyncio
 from websockets.asyncio.server import serve, ServerConnection
 import json
 import threading
-import time
 import functools
 from typing import List
 from follow_point import FollowPoint as fp
 from client.robot_dto import Robot
 import websockets
 import main as m
+import server_state as s_state
 
 
 
 ip="0.0.0.0"
-# ip="localhost"
-connected_clients = {}
-def send_update(robot_dto):
-    if robot_dto.marker.id in connected_clients:
-        asyncio.run(_send_update_msg(robot_dto))
-
 
 def send_stop_robot(robot_dto):
-    if robot_dto.marker.id in connected_clients:
-        asyncio.run(_send_stop_robot_msg(robot_dto))
+    if robot_dto.marker.id in s_state.connected_clients:
+        asyncio.run_coroutine_threadsafe(
+            _send_stop_robot_msg(robot_dto), 
+            s_state.loop  # You need to store the main loop reference
+        )
+
+
 
 
 
 async def _send_update_msg(robot_dto):
-    client = connected_clients[robot_dto.marker.id]
-    async with websockets.connect(client) as websocket:
-            event = {
-                "type": "update-pos",
-                "robot": robot_dto
+    client = s_state.connected_clients[robot_dto.marker.id]
+    event = {
+        "type": "update-pos",
+        "robot": {
+            "marker_id":int(robot_dto.marker.id),
+            "pos":robot_dto.pos.tolist(),
+            "angle":robot_dto.angle.tolist(),
+            "follow_point":robot_dto.follow_point.pos,
+            "deltaPos":{
+                "linear":robot_dto.deltaPos.linear,
+                "angular":robot_dto.deltaPos.angular
             }
-            
-            await websocket.send(json.dumps(event))
+        }
+    }
+    
+    await client.send(json.dumps(event))
 
 async def _send_stop_robot_msg(robot_dto):
-    client = connected_clients[robot_dto.marker.id]
-    async with websockets.connect(client) as websocket:
+    client = s_state.connected_clients[robot_dto.marker.id]
+    async with client:
             event = {
                 "type": "stop-robot",
-                "robot": robot_dto
+                "robot": {
+                    "marker_id":robot_dto.marker.id
+                }
             }
             
-            await websocket.send(json.dumps(event))
+            await client.send(json.dumps(event))
 
 
 
 async def echo(websocket:ServerConnection):
     message = await websocket.recv()
     event = json.loads(message)
+
+            
+
+    if event["type"] == "get-status":
+        status_msg = {
+                "type": "get-status",
+                "value": s_state.status
+        }
+        await websocket.send(json.dumps(status_msg))
+
+    if event["type"] == "update-pos":
+        if "robot" in event:
+            id = event["robot"]["marker_id"]
+            updated_robot = s_state.robot_new_values[id]
+            msg = {
+                "type": "update-pos",
+                "robot": {
+                    "marker_id":int(updated_robot.marker.id),
+                    "pos":updated_robot.pos.tolist(),
+                    "angle":updated_robot.angle.tolist(),
+                    "follow_point":updated_robot.follow_point.pos,
+                    "deltaPos":{
+                        "linear":updated_robot.deltaPos.linear,
+                        "angular":updated_robot.deltaPos.angular
+                    }
+                }
+            }
+
+        await websocket.send(json.dumps(msg))    
    
     # assert event["type"] == "start"
     if event["type"] == "init-marker":
-        if "marker" in event:
-            marker_id = event["id"]
-            connected_clients[marker_id] = websocket.remote_address
-            m.init(marker_id)
-            
+
+        if "robot" in event:
+            init_marker_msg = {
+                "type": "init-marker",
+                "robot": {
+                    "marker_id":event["robot"]["marker_id"]
+                }
+            }
+            marker_id = event["robot"]["marker_id"]
+            s_state.connected_clients[marker_id] = websocket
+            await websocket.send(json.dumps(init_marker_msg))
+ 
+            if s_state.init_thread == None:
+                s_state.init_thread = threading.Thread(target=m.init,name="init-marker")
+                s_state.init_thread.start()
+                
+
+                
+
+
+
     else:
         KeyError("NO route finded")
 
@@ -72,11 +126,19 @@ async def echo(websocket:ServerConnection):
 
 async def main():
     print("<!!!! Run SERVER !!!!>")
+    s_state.loop = asyncio.get_event_loop()
     bound_handler = functools.partial(echo)
     async with serve(bound_handler, ip, 8765) as server:
         await server.serve_forever()
+    
+
 
 
 def run_server():
     asyncio.run(main())
+
+if __name__ == "__main__":
+    run_server()
+
+
 

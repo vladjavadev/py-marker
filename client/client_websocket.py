@@ -3,10 +3,11 @@
 import asyncio
 from websockets.asyncio.client import connect
 import json
-from robot_dto import Servant
+from robot_dto import Robot
 from typing import List
 from marker import Marker
-from status import Status
+import time
+import client_state as cs
 
 
 
@@ -17,50 +18,72 @@ from status import Status
 # uri = "ws://192.168.7.2:8765"
 # uri = "ws://localhost:8765"
 # uri = "ws://192.168.178.58:8765"
-uri = "ws://192.168.0.45:8765"
+uri = "ws://localhost:8765"
 
 m_types = ["init-marker","update-pos","get-status"]
 
-servant_dict= {}
 
-status = Status("initial")
+
+async def get_status():
+    status = await _fetch_connection_status()
+    return status
+
+
 
 async def init_marker(marker):
-    msg_body = {"marker": marker}
-    call_func = send_message("init-marker", msg_body)
-    asyncio.run(call_func)
+    msg_body = {"robot":{"marker_id": marker.id}}
+    await _send_message("init-marker", msg_body)
 
-async def update_pos(marker):
-    msg_body = {"marker": marker}
-    call_func = fetch_pos("update-pos", msg_body)
-    asyncio.run(call_func)
+async def update_pos():
+    await _update_pos()
 
-async def position_handler():
+
+
+
+
+
+async def _update_pos():
+
     try:
         async with connect(uri) as websocket:
+            event = {
+                "type": "update-pos",
+                "robot":{
+                    "marker_id": cs.marker_id
+                }
+            }
+            
+            await websocket.send(json.dumps(event))
+            print(f"✓ Событие отправлено: {event}")
+            
+            # Опционально: ожидание ответа от сервера
+            try:
+                response = await asyncio.wait_for(websocket.recv(),timeout=8.0)
+                msg = json.loads(response)
+                if msg["type"] == "update-pos":
+                    if "robot" in msg:
+                        robot_state  = msg["robot"]
+                        id = robot_state["marker_id"]
+                        pos = robot_state["pos"]
+                        angle = robot_state["angle"]
+                        fp = robot_state["follow_point"]
+                        cs.robot.update_pos(pos,angle)
+                        cs.robot.update_fp(fp)
 
-            async with websocket.connect(uri) as ws:
-                while True:
-                    message = await ws.recv()
-                    print("Получено:", message)
-                    if message["type"] == "update-pos":
-                        if "robot" in message:
-                            id = message["id"]
-                            if id in servant_dict:
-                                linear = message["linear"]
-                                angular = message["angular"]         
-                                robot = servant_dict[id]
-                                robot.update_delta(linear, angular)
-                            
+                    print(f"Ответ сервера: {response}")
+            except asyncio.TimeoutError:
+                print("Сервер не ответил в течение 5 секунд")
+            
     except ConnectionRefusedError:
         print("❌ Не удалось подключиться к серверу. Проверьте, что сервер запущен на ws://localhost:8765")
     except Exception as e:
         print(f"❌ Ошибка: {e}")
 
 
+   
 
 
-async def send_message(type, message):
+async def _send_message(type, message):
 
     try:
         async with connect(uri) as websocket:
@@ -74,20 +97,14 @@ async def send_message(type, message):
             
             # Опционально: ожидание ответа от сервера
             try:
-                response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
-                init_marker = json.loads(response)
-                if init_marker["type"] == "init-marker":
-                    if "marker" in init_marker:
-                        id = init_marker["id"]
-                        pos = init_marker["pos"]
-                        angle = init_marker["angle"]
-                        fp = init_marker["follow_point"]
-                        servant_robot = Servant(Marker(id))
-                        servant_robot.update_pos(pos,angle)
-                        servant_robot.update_fp(fp)
+                response = await asyncio.wait_for(websocket.recv(),timeout=5.0)
+                msg = json.loads(response)
+                if msg["type"] == "init-marker":
+                        if "robot" in msg:
+                            robot_state = msg["robot"]
+                            id = robot_state["marker_id"]
+                            cs.robot = Robot(Marker(id))
 
-                        servant_dict[id] = servant_robot
-                print(f"Ответ сервера: {response}")
             except asyncio.TimeoutError:
                 print("Сервер не ответил в течение 5 секунд")
             
@@ -98,8 +115,7 @@ async def send_message(type, message):
 
 
    
-async def fetch_connection_status():
-
+async def _fetch_connection_status():
     try:
         async with connect(uri) as websocket:
             event = {
@@ -111,11 +127,11 @@ async def fetch_connection_status():
             
             # Опционально: ожидание ответа от сервера
             try:
-                response = await asyncio.wait_for(websocket.recv(), timeout=40.0)
+                response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
                 event = json.loads(response)
                 if event["type"] == "get-status":
-                    if "status" in event:
-                        status.update(event["status"])
+                    if "value" in event:
+                        cs.status = event["value"]
                 print(f"Ответ сервера: {response}")
             except asyncio.TimeoutError:
                 print("Сервер не ответил в течение 5 секунд")
@@ -127,8 +143,44 @@ async def fetch_connection_status():
 
 
 
+async def main():
+    print("start client")
+    count = 0
+    max_count = 10
+    while True:
+
+        marker_id = int(input("Marker_ID: "))
+        cs.marker_id = marker_id
+        
+        await init_marker(Marker(marker_id))
+
+        while count<max_count:
+            await get_status()
+            if cs.status=="wait-clients":
+                break
+            time.sleep(1)
+
+
+        while cs.status == "wait-clients":
+            await get_status()
+
+            print("Wait other clients ...")
+            time.sleep(2)  # keep the loop alive long enough
+        break
+
+        # time.sleep(10)
+    while cs.status == "update-pos":
+        await get_status()
+        time.sleep(0.1)
+        await update_pos()
+
+    
+
+
 if __name__ == "__main__":
     try:
-        asyncio.run(send_message())
+        asyncio.run(main())
+
+    
     except KeyboardInterrupt:
         print("\n\nПрограмма прервана пользователем")

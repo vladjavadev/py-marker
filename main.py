@@ -10,8 +10,8 @@ from typing import List
 from follow_point import FollowPoint as fp
 import server_websocket as sw
 from client.marker import Marker
-
-
+import server_state as s_state
+import asyncio
 
 
 pre_proc_frames = deque(maxlen=3)
@@ -63,10 +63,10 @@ def read_img():
             pre_proc_frames.clear()
             pre_proc_frames.append(last)
         else:
-            ret, frame = cap.read()
+            frame = cv2.imread(f"test-img/image{ix+1}.png")
             pre_proc_frames.append(frame)
             print("reading time: ", time.time()-start)
-        ix=(ix+1)%4
+        ix=(ix+1)%3
         
 
 
@@ -83,54 +83,72 @@ def prepocess_img():
             # frame = cv2.resize(frame, (320, 240))
             # frame = frame[0:120, :]
             post_proc_frames.append(frame)
+       
             print("preproc time: ", time.time()-start)
 
+
+def wait_client(id):
+    s_state.status="wait-clients"
+    count = 0
+    max_iteration = 50
+    while count<max_iteration:
+        if id in s_state.connected_clients:
+            return True
+        time.sleep(1)
+        count+=1
+
+    return False
+    
+    
 def init():
-    for i in range(4):
-        ret, frame = cap.read()
+    frame = cv2.imread("test-img/image3.png")
 
 
-        # Словник маркерів
-        dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+    # Словник маркерів
+    dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
-        # Детекція маркерів
-        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # Детекція маркерів
+    # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        corners, ids, rejected = aruco.detectMarkers(frame, dictionary)
-
-
-
-        # Оцінка позиції
-        if ids is not None:
-            _, tvecs, _ = aruco.estimatePoseSingleMarkers(corners, 0.05, camera_matrix, dist_coeffs)
-            for i in range(len(ids)):
-                id = ids[i][0]
-                if id not in robot_dto_dict:
-                    marker = Marker(id)
-                    robot_dto_dict[id] = Robot(marker=marker)
-
-                robot = robot_dto_dict[id]
-
-                tvec = tvecs[i][0]
-                lst_dist = float("inf")
-                target_fp = None
-                for fp in follow_points:
-
-                    # Вычисление целевой ориентации
-                    P_target = np.array(fp.pos) # Точка, на которую должен смотреть маркер
+    corners, ids, rejected = aruco.detectMarkers(frame, dictionary)
 
 
-                    distance = np.linalg.norm(tvec - P_target)
-                    if fp.available:
-                        if distance < lst_dist:
-                            lst_dist = distance
-                            target_fp = fp
-                if target_fp:
-                    target_fp.available=False
-                    robot.follow_point = target_fp
 
-        time.sleep(0.15)
+    # Оцінка позиції
+    if ids is not None:
+        _, tvecs, _ = aruco.estimatePoseSingleMarkers(corners, 0.05, camera_matrix, dist_coeffs)
+        for i in range(len(ids)):
+            id = ids[i][0]
+            is_connected = wait_client(id)
+            if not is_connected:
+                continue
 
+            if id not in robot_dto_dict:
+                marker = Marker(id)
+                robot_dto_dict[id] = Robot(marker=marker)
+
+            robot = robot_dto_dict[id]
+
+            tvec = tvecs[i][0]
+            lst_dist = float("inf")
+            target_fp = None
+            for fp in follow_points:
+
+                # Вычисление целевой ориентации
+                P_target = np.array(fp.pos) # Точка, на которую должен смотреть маркер
+
+
+                distance = np.linalg.norm(tvec - P_target)
+                if fp.available:
+                    if distance < lst_dist:
+                        lst_dist = distance
+                        target_fp = fp
+
+            if target_fp:
+                target_fp.available=False
+                robot.follow_point = target_fp
+
+    time.sleep(0.15)
     print("RUN THREADS")
     threads = [
         threading.Thread(target=read_img,name="Read Image"),
@@ -139,10 +157,12 @@ def init():
     ]
     for i in threads:
         i.start()
-  
+
+
 
 
 def detect_markers():
+    s_state.status="update-pos"
     _lock = threading.Lock()
     while True:
         time.sleep(0.1)
@@ -166,7 +186,7 @@ def detect_markers():
         if ids is not None:
             rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(corners, 0.05, camera_matrix, dist_coeffs)
             for i in range(len(ids)):
-                
+                marker_id = int(ids[i][0])
                 if ids[i][0] not in  robot_dto_dict:
                     continue
                     
@@ -227,8 +247,10 @@ def detect_markers():
                 robot.deltaPos = DeltaPos()
                 robot.deltaPos.linear = distance
                 robot.deltaPos.angular = y_axis
-                sw.send_update(robot)
 
+                _lock.acquire()
+                s_state.robot_new_values[marker_id] = robot
+                _lock.release()
 
                 target_img_point, _ = cv2.projectPoints(
                     P_target.reshape(1, 3), 
