@@ -1,4 +1,4 @@
-from marker import Marker
+from data.marker import Marker
 
 class DeltaPos:
     def __init__(self):

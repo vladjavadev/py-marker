@@ -4,14 +4,11 @@ import numpy as np
 import time
 from collections import deque
 import threading
-from client.robot_dto import Robot
-from client.robot_dto import DeltaPos
-from typing import List
-from follow_point import FollowPoint as fp
-import server_websocket as sw
-from client.marker import Marker
-import server_state as s_state
-import asyncio
+from data.robot_dto import Robot
+from data.robot_dto import DeltaPos
+from data.follow_point import FollowPoint as fp
+from data.marker import Marker
+import data.server_state as s_state
 
 
 pre_proc_frames = deque(maxlen=3)
@@ -35,7 +32,7 @@ dt = 0.05
 
 try:
     # Завантажуємо дані з файлу, створеного скриптом калібрування
-    calibration_data = np.load('camera_params.npz')
+    calibration_data = np.load('server/data/camera_params.npz')
     
     # Витягуємо матрицю камери та коефіцієнти спотворення
     camera_matrix = calibration_data['mtx']
@@ -119,9 +116,9 @@ def init():
         _, tvecs, _ = aruco.estimatePoseSingleMarkers(corners, 0.05, camera_matrix, dist_coeffs)
         for i in range(len(ids)):
             id = ids[i][0]
-            is_connected = wait_client(id)
-            if not is_connected:
-                continue
+            # is_connected = wait_client(id)
+            # if not is_connected:
+            #     continue
 
             if id not in robot_dto_dict:
                 marker = Marker(id)
@@ -207,7 +204,7 @@ def detect_markers():
                 # Вычисление целевой ориентации
                 robot = robot_dto_dict[ids[i][0]]
                 robot.pos = tvec
-                robot.angle = rvecs[i]
+                robot.angle = rvecs[i][0]
 
                 P_target =  np.array(robot.follow_point.pos)
                 V_up = np.array([0, 1, 0])  # Вектор "вверх"

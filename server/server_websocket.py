@@ -7,12 +7,8 @@ from websockets.asyncio.server import serve, ServerConnection
 import json
 import threading
 import functools
-from typing import List
-from follow_point import FollowPoint as fp
-from client.robot_dto import Robot
-import websockets
-import main as m
-import server_state as s_state
+import core.marker_proc as m
+import data.server_state as s_state
 
 
 

@@ -1,9 +1,9 @@
 import time
 from typing import Optional
 
-from robot import kinematic as rk
-from mock_motor_driver import MotorDriver
-from pid_controller import PID
+import core.kinematic as rk
+from core.mock_motor_driver import MotorDriver
+from core.pid_controller import PID
 
 
 class SlaveController:
