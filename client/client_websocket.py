@@ -10,6 +10,7 @@ import data.client_state as cs
 from core.servant_controller import SlaveController
 import math
 import core.kinematic as rk
+import numpy as np
 
 # Import kinematic functions from robot.kinematic module
 
@@ -76,44 +77,133 @@ class RobotClient:
         except Exception as e:
             print(f"❌ Ошибка: {e}")
     
+
     async def _calculate_and_apply_control(self, pos, angle, follow_point):
-        """Calculate motor velocities based on position and target."""
+        """Calculate motor velocities based on position and target using rotation vectors."""
         if follow_point is None:
             # Stop if no target
             self.controller.set_target_velocity(0.0, 0.0)
             self.controller.update()
             return
-        angle_y = angle[1]
-        # Calculate distance and angle to target
-        dx = follow_point[0] - pos[0]
-        dz = follow_point[2] - pos[2]
-        distance = math.sqrt(dx**2 + dz**2)*1000
-        target_angle = math.atan2(dx,dz)
         
-        # Calculate angle error
-        angle_error = self._normalize_angle(target_angle - angle_y)
+        # Convert inputs to numpy arrays
+        pos = np.array(pos)
+        follow_point = np.array(follow_point)
+        rvec = np.array(angle)  # angle is the rotation vector (rvec)
         
-        # Simple control law
-        if distance < 20:  # Stop threshold (20mm)
+        # Calculate target direction vector
+        P_target = follow_point
+        V_up = np.array([0, 1, 0])  # Up vector
+        
+        # Calculate target orientation axes
+        Z_target = P_target - pos
+        Z_target_norm = np.linalg.norm(Z_target)
+        
+        # Check if target is too close (avoid division by zero)
+        if Z_target_norm < 1e-6:
+            self.controller.set_target_velocity(0.0, 0.0)
+            self.controller.update()
+            return
+        
+        Z_target_unit = Z_target / Z_target_norm
+        
+        # Calculate perpendicular axes
+        X_target = np.cross(Z_target_unit, V_up)
+        X_target_norm = np.linalg.norm(X_target)
+        
+        # Handle case where Z_target is parallel to V_up
+        if X_target_norm < 1e-6:
+            X_target_unit = np.array([1, 0, 0])
+        else:
+            X_target_unit = X_target / X_target_norm
+        
+        Y_target_unit = np.cross(Z_target_unit, X_target_unit)
+        
+        # Build target rotation matrix
+        R_target = np.column_stack((X_target_unit, Y_target_unit, Z_target_unit))
+        
+        # Convert current rotation vector to rotation matrix (Rodrigues formula)
+        # R = I + sin(θ) * K + (1 - cos(θ)) * K²
+        # where K is the skew-symmetric matrix of the normalized axis
+        
+        theta = np.linalg.norm(rvec)
+        
+        if theta < 1e-6:
+            # No rotation, use identity matrix
+            R_marker = np.eye(3)
+        else:
+            # Normalize rotation axis
+            k = rvec / theta
+            
+            # Create skew-symmetric matrix K
+            K = np.array([
+                [0, -k[2], k[1]],
+                [k[2], 0, -k[0]],
+                [-k[1], k[0], 0]
+            ])
+            
+            # Rodrigues' rotation formula
+            R_marker = np.eye(3) + np.sin(theta) * K + (1 - np.cos(theta)) * (K @ K)
+        
+        # Calculate rotation difference
+        R_delta = R_target @ R_marker.T
+        
+        # Calculate rotation angle theta from R_delta
+        trace_R = np.trace(R_delta)
+        theta_delta = np.arccos(np.clip((trace_R - 1) / 2, -1.0, 1.0))
+        
+        # Extract rotation axis from R_delta
+        if np.abs(theta_delta) < 1e-6:
+            # No rotation needed
+            angular_omega = 0.0
+        else:
+            # Rotation axis from skew-symmetric part of R_delta
+            # For small angles or to get the y-component of rotation axis:
+            rotation_axis = np.array([
+                R_delta[2, 1] - R_delta[1, 2],
+                R_delta[0, 2] - R_delta[2, 0],
+                R_delta[1, 0] - R_delta[0, 1]
+            ])
+            
+            axis_norm = np.linalg.norm(rotation_axis)
+            if axis_norm > 1e-6:
+                rotation_axis = rotation_axis / axis_norm
+            
+            # Project rotation onto y-axis (vertical axis rotation)
+            y_component = rotation_axis[1] * theta_delta
+            
+            # For 2D robot control, use the y-axis rotation component
+            angular_omega = y_component * 2.0  # ANGULAR_GAIN
+        
+        # Calculate distance in horizontal plane
+        distance = np.sqrt((follow_point[0] - pos[0])**2 + (follow_point[2] - pos[2])**2) * 1000  # mm
+        
+        # Control law with tunable gains
+        STOP_THRESHOLD_MM = 20.0
+        LINEAR_GAIN = 2.0
+        ANGULAR_GAIN = 2.0
+        TURN_THRESHOLD_RAD = 0.5  # ~30 degrees
+        
+        if distance < STOP_THRESHOLD_MM:
+            # Stop if close enough
             linear_v = 0.0
             angular_omega = 0.0
         else:
             # Linear velocity proportional to distance
-            linear_v = min(distance * 2.0, self.controller.v_max)
+            linear_v = np.minimum(distance * LINEAR_GAIN, self.controller.v_max)
             
-            # Angular velocity proportional to angle error
-            angular_omega = angle_error * 2.0  # gain factor
-            
-            # Reduce linear velocity when turning
-            if abs(angle_error) > 0.5:  # ~30 degrees
+            # Reduce linear velocity when turning sharply
+            if np.abs(angular_omega) > TURN_THRESHOLD_RAD:
                 linear_v *= 0.5
         
         # Apply velocities
-        self.controller.set_target_velocity(linear_v, angular_omega)
+        self.controller.set_target_velocity(float(linear_v), float(angular_omega))
         self.controller.update()
         
-        print(f"Управление: v={linear_v:.1f} mm/s, ω={angular_omega:.2f} rad/s")
-    
+        print(f"Управление: v={linear_v:.1f} mm/s, ω={angular_omega:.2f} rad/s, "
+            f"distance={distance:.1f} mm, theta_delta={np.degrees(theta_delta):.1f}°")
+        
+
     @staticmethod
     def _normalize_angle(angle):
         """Normalize angle to [-pi, pi]."""
