@@ -46,7 +46,7 @@ class RobotClient:
                 }
                 
                 await websocket.send(json.dumps(event))
-                print(f"✓ Событие отправлено: {event}")
+                # print(f"✓ Event send: {event}")
                 
                 try:
                     response = await asyncio.wait_for(websocket.recv(), timeout=8.0)
@@ -67,142 +67,84 @@ class RobotClient:
                             # Calculate and apply motor control
                             await self._calculate_and_apply_control(pos, angle, fp)
                             
-                            print(f"Позиция обновлена: {pos}, угол: {angle}")
+                            # print(f"New pos: {pos}, angle: {angle}")
                             
                 except asyncio.TimeoutError:
-                    print("Сервер не ответил в течение 8 секунд")
+                    print("Server not respond")
                     
         except ConnectionRefusedError:
-            print("❌ Не удалось подключиться к серверу")
+            print("Connection refused")
         except Exception as e:
-            print(f"❌ Ошибка: {e}")
+            print(f"Error: {e}")
     
 
     async def _calculate_and_apply_control(self, pos, angle, follow_point):
         """Calculate motor velocities based on position and target using rotation vectors."""
         if follow_point is None:
-            # Stop if no target
             self.controller.set_target_velocity(0.0, 0.0)
             self.controller.update()
             return
         
-        # Convert inputs to numpy arrays
-        pos = np.array(pos)
-        follow_point = np.array(follow_point)
-        rvec = np.array(angle)  # angle is the rotation vector (rvec)
+        # Convert inputs to numpy arrays (минимизируем создание массивов)
+        pos = np.asarray(pos, dtype=np.float32)
+        follow_point = np.asarray(follow_point, dtype=np.float32)
+        rvec = np.asarray(angle, dtype=np.float32)
         
-        # Calculate target direction vector
-        P_target = follow_point
-        V_up = np.array([0, 1, 0])  # Up vector
+        # --- УПРОЩЕННЫЙ ПОДХОД ДЛЯ 2D РОБОТА ---
+        # Вместо полных 3D матриц используем 2D геометрию
         
-        # Calculate target orientation axes
-        Z_target = P_target - pos
-        Z_target_norm = np.linalg.norm(Z_target)
+        # Вектор к цели в горизонтальной плоскости
+        dx = follow_point[0] - pos[0]
+        dz = follow_point[2] - pos[2]
+        distance = np.sqrt(dx*dx + dz*dz) * 1000  # mm
         
-        # Check if target is too close (avoid division by zero)
-        if Z_target_norm < 1e-6:
+        # Проверка близости к цели
+        if distance < 20.0:  # STOP_THRESHOLD_MM
             self.controller.set_target_velocity(0.0, 0.0)
             self.controller.update()
             return
         
-        Z_target_unit = Z_target / Z_target_norm
+        # Целевой угол (atan2 быстрее матричных операций)
+        target_angle = np.arctan2(dx, dz)
         
-        # Calculate perpendicular axes
-        X_target = np.cross(Z_target_unit, V_up)
-        X_target_norm = np.linalg.norm(X_target)
-        
-        # Handle case where Z_target is parallel to V_up
-        if X_target_norm < 1e-6:
-            X_target_unit = np.array([1, 0, 0])
-        else:
-            X_target_unit = X_target / X_target_norm
-        
-        Y_target_unit = np.cross(Z_target_unit, X_target_unit)
-        
-        # Build target rotation matrix
-        R_target = np.column_stack((X_target_unit, Y_target_unit, Z_target_unit))
-        
-        # Convert current rotation vector to rotation matrix (Rodrigues formula)
-        # R = I + sin(θ) * K + (1 - cos(θ)) * K²
-        # where K is the skew-symmetric matrix of the normalized axis
-        
+        # Текущий угол робота из rotation vector
+        # Для 2D достаточно Y-компоненты rvec
         theta = np.linalg.norm(rvec)
         
         if theta < 1e-6:
-            # No rotation, use identity matrix
-            R_marker = np.eye(3)
+            current_angle = 0.0
         else:
-            # Normalize rotation axis
-            k = rvec / theta
-            
-            # Create skew-symmetric matrix K
-            K = np.array([
-                [0, -k[2], k[1]],
-                [k[2], 0, -k[0]],
-                [-k[1], k[0], 0]
-            ])
-            
-            # Rodrigues' rotation formula
-            R_marker = np.eye(3) + np.sin(theta) * K + (1 - np.cos(theta)) * (K @ K)
+            # Упрощенное извлечение угла поворота вокруг Y
+            # Для малых углов: угол ≈ rvec[1]
+            current_angle = rvec[1] if theta < 0.1 else np.arctan2(rvec[0], rvec[2])
         
-        # Calculate rotation difference
-        R_delta = R_target @ R_marker.T
+        # Разница углов (нормализованная)
+        angle_diff = target_angle - current_angle
+        # Нормализация в [-π, π]
+        angle_diff = np.arctan2(np.sin(angle_diff), np.cos(angle_diff))
         
-        # Calculate rotation angle theta from R_delta
-        trace_R = np.trace(R_delta)
-        theta_delta = np.arccos(np.clip((trace_R - 1) / 2, -1.0, 1.0))
-        
-        # Extract rotation axis from R_delta
-        if np.abs(theta_delta) < 1e-6:
-            # No rotation needed
-            angular_omega = 0.0
-        else:
-            # Rotation axis from skew-symmetric part of R_delta
-            # For small angles or to get the y-component of rotation axis:
-            rotation_axis = np.array([
-                R_delta[2, 1] - R_delta[1, 2],
-                R_delta[0, 2] - R_delta[2, 0],
-                R_delta[1, 0] - R_delta[0, 1]
-            ])
-            
-            axis_norm = np.linalg.norm(rotation_axis)
-            if axis_norm > 1e-6:
-                rotation_axis = rotation_axis / axis_norm
-            
-            # Project rotation onto y-axis (vertical axis rotation)
-            y_component = rotation_axis[1] * theta_delta
-            
-            # For 2D robot control, use the y-axis rotation component
-            angular_omega = y_component * 2.0  # ANGULAR_GAIN
-        
-        # Calculate distance in horizontal plane
-        distance = np.sqrt((follow_point[0] - pos[0])**2 + (follow_point[2] - pos[2])**2) * 1000  # mm
-        
-        # Control law with tunable gains
-        STOP_THRESHOLD_MM = 20.0
+        # --- УПРАВЛЕНИЕ ---
         LINEAR_GAIN = 2.0
         ANGULAR_GAIN = 2.0
-        TURN_THRESHOLD_RAD = 0.5  # ~30 degrees
+        TURN_THRESHOLD = 0.5  # ~30 градусов
         
-        if distance < STOP_THRESHOLD_MM:
-            # Stop if close enough
-            linear_v = 0.0
-            angular_omega = 0.0
-        else:
-            # Linear velocity proportional to distance
-            linear_v = np.minimum(distance * LINEAR_GAIN, self.controller.v_max)
-            
-            # Reduce linear velocity when turning sharply
-            if np.abs(angular_omega) > TURN_THRESHOLD_RAD:
-                linear_v *= 0.5
+        # Угловая скорость
+        angular_omega = angle_diff * ANGULAR_GAIN
         
-        # Apply velocities
+        # Линейная скорость с ограничением
+        linear_v = min(distance * LINEAR_GAIN, self.controller.v_max)
+        
+        # Замедление при резких поворотах
+        if abs(angle_diff) > TURN_THRESHOLD:
+            linear_v *= 0.5
+        
+        # Применение управления
         self.controller.set_target_velocity(float(linear_v), float(angular_omega))
         self.controller.update()
         
-        print(f"Управление: v={linear_v:.1f} mm/s, ω={angular_omega:.2f} rad/s, "
-            f"distance={distance:.1f} mm, theta_delta={np.degrees(theta_delta):.1f}°")
-        
+        # Упрощенный вывод (print может быть узким местом)
+        if distance > 50:  # Печатаем только если далеко от цели
+            print(f"v={linear_v:.0f} ω={angular_omega:.2f} d={distance:.0f}mm")
 
     @staticmethod
     def _normalize_angle(angle):
@@ -220,7 +162,7 @@ class RobotClient:
                 event = {"type": "get-status"}
                 
                 await websocket.send(json.dumps(event))
-                print(f"✓ Событие отправлено: {event}")
+                print(f"Event send: {event}")
                 
                 try:
                     response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
@@ -228,14 +170,14 @@ class RobotClient:
                     if event["type"] == "get-status":
                         if "value" in event:
                             cs.status = event["value"]
-                    print(f"Статус: {cs.status}")
+                    print(f"Status: {cs.status}")
                 except asyncio.TimeoutError:
-                    print("Сервер не ответил в течение 5 секунд")
+                    print("Server not respond")
                     
         except ConnectionRefusedError:
-            print("❌ Не удалось подключиться к серверу")
+            print("Connection refused")
         except Exception as e:
-            print(f"❌ Ошибка: {e}")
+            print(f"Error: {e}")
     
     async def _send_message(self, msg_type: str, message: dict):
         """Send message to WebSocket server."""
@@ -247,7 +189,7 @@ class RobotClient:
                 }
                 
                 await websocket.send(json.dumps(event))
-                print(f"✓ Событие отправлено: {event}")
+                print(f"Event send: {event}")
                 
                 try:
                     response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
@@ -260,23 +202,23 @@ class RobotClient:
                             print(f"Робот инициализирован с marker_id={marker_id}")
                             
                 except asyncio.TimeoutError:
-                    print("Сервер не ответил в течение 5 секунд")
+                    print("Server not respond")
                     
         except ConnectionRefusedError:
-            print("❌ Не удалось подключиться к серверу")
+            print("Connection refused")
         except Exception as e:
-            print(f"❌ Ошибка: {e}")
+            print(f"Error : {e}")
 
 
 async def main():
     """Main control loop - calls functions from other modules."""
-    print("=== Запуск интегрированного клиента робота ===")
+    print("=== Start client robot ===")
     
     # Initialize robot client with max velocity from kinematic module
     robot_client = RobotClient(v_max=rk.speeds[-1])
     while cs.status=="start-client":
         await robot_client.get_status()
-        time.sleep(0.1)
+        await asyncio.sleep(0.1)
     
     # Get marker ID from user
     marker_id = cs.marker_id
@@ -285,20 +227,18 @@ async def main():
     marker = Marker(marker_id)
     await robot_client.init_marker(marker)
     
-    print("Ожидание инициализации...")
+    print("init...")
     time.sleep(6)
     
     # Wait for other clients
     await robot_client.get_status()
     while cs.status == "wait-clients":
-        print("Ожидание других клиентов...")
+        print("wait clients...")
         await robot_client.get_status()
         await asyncio.sleep(2)
     
     
-    print("Все клиенты подключены! Начинаем управление.")
-    
-    # Main control loop
+    print("Start movement")
     while cs.status == "update-pos":
         # Calls update_pos which internally:
         # - Updates cs.robot (Robot class from robot_dto.py)
@@ -309,13 +249,13 @@ async def main():
     # Stop motors when done (calls SlaveController methods)
     robot_client.controller.set_target_velocity(0.0, 0.0)
     robot_client.controller.update()
-    print("Управление завершено.")
+    print("Move end")
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n\n⚠️ Программа прервана пользователем")
+        print("\n\n Program interrupted by user")
     except Exception as e:
-        print(f"\n\n❌ Критическая ошибка: {e}")
+        print(f"\n\nCritical error: {e}")
