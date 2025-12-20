@@ -24,29 +24,25 @@ follow_points = [
 
 
 
-# Основной код
 start = time.time()
 dt = 0.05
 
 
 
 try:
-    # Завантажуємо дані з файлу, створеного скриптом калібрування
+    # load camera params from file
     calibration_data = np.load('server/data/camera_params.npz')
     
-    # Витягуємо матрицю камери та коефіцієнти спотворення
+    # parse data
     camera_matrix = calibration_data['mtx']
     dist_coeffs = calibration_data['dist']
     
-    print("Параметри калібрування успішно завантажено!")
+    print("calibrate params loads successfully")
     
 except FileNotFoundError:
-    print("ПОМИЛКА: Файл 'camera_params.npz' не знайдено.")
-    print("Переконайтеся, що ви виконали калібрування та зберегли файл у тій же папці.")
-    # Тут можна залишити умовні значення, але оцінка позиції буде неточною
-    # camera_matrix = ...
-    # dist_coeffs = ...
-    exit() # Або завершити програму, якщо калібрування критично важливе
+    print("Error: calibrate params file not found")
+
+    exit() 
 
 cap = cv2.VideoCapture(1)
 
@@ -104,17 +100,16 @@ def init():
         _, frame = cap.read()
 
 
-        # Словник маркерів
+        # marker dictionary
         dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
-        # Детекція маркерів
         # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         corners, ids, rejected = aruco.detectMarkers(frame, dictionary)
 
 
 
-    # Оцінка позиції
+    # Estimate pos
     if ids is not None:
         _, tvecs, _ = aruco.estimatePoseSingleMarkers(corners, 0.05, camera_matrix, dist_coeffs)
         for i in range(len(ids)):
@@ -134,8 +129,8 @@ def init():
             target_fp = None
             for fp in follow_points:
 
-                # Вычисление целевой ориентации
-                P_target = np.array(fp.pos) # Точка, на которую должен смотреть маркер
+                # Current pos
+                P_target = np.array(fp.pos) 
 
 
                 distance = np.linalg.norm(tvec - P_target)
@@ -173,16 +168,13 @@ def detect_markers():
         frame = post_proc_frames.pop()
         _lock.release()
 
-        # Словник маркерів
+
         dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
-        # Детекція маркерів
-        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         corners, ids, rejected = aruco.detectMarkers(frame, dictionary)
 
 
-        # Оцінка позиції
         if ids is not None:
             rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(corners, 0.05, camera_matrix, dist_coeffs)
             for i in range(len(ids)):
@@ -191,28 +183,20 @@ def detect_markers():
                     continue
                     
 
-                # if i not in marker_pid:
-                #     marker_pid[i] = {"linear":PIDController(Kp=0.5, Ki=0.0, Kd=0.1),
-                #               "angular":PIDController(Kp=1.0, Ki=0.0, Kd=0.2)}
-
-                # pid_linear = marker_pid[i]["linear"]
-                # pid_angular = marker_pid[i]["angular"]
-
-
-                # Рисуем текущие оси маркера (красные)
+                # draw marker axis
                 cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvecs[i], tvecs[i], 0.05)
                 
                 tvec = tvecs[i][0]
                 
-                # Вычисление целевой ориентации
+                # calculate current orientation
                 robot = robot_dto_dict[ids[i][0]]
                 robot.pos = tvec
                 robot.angle = rvecs[i][0]
 
                 P_target =  np.array(robot.follow_point.pos)
-                V_up = np.array([0, 1, 0])  # Вектор "вверх"
+                V_up = np.array([0, 1, 0]) #up vector
                 
-                # Вычисление осей целевой ориентации
+                #calc current orientation axis
                 Z_target = P_target - tvec
                 Z_target_unit = Z_target / np.linalg.norm(Z_target)
                 
@@ -221,12 +205,11 @@ def detect_markers():
                 
                 Y_target_unit = np.cross(Z_target_unit, X_target_unit)
                 
-                # Построение матрицы поворота
+                # build rotate matrix
                 R_target = np.column_stack((X_target_unit, Y_target_unit, Z_target_unit))
 
 
-                # Рисуем целевые оси (зеленые)
-                # cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvec_target, tvecs[i], 0.05)
+
                 R_marker, _ = cv2.Rodrigues(rvecs[i])
                 R_camera = R_target
                 print(f"Rmarker: {R_marker}")
@@ -262,12 +245,12 @@ def detect_markers():
                 
                 cv2.circle(frame, 
                         tuple(target_img_point[0][0].astype(int)), 
-                        10, (255, 255, 0), -1)  # Голубая точка
+                        10, (255, 255, 0), -1)  
                 cv2.putText(frame, "FOLLOW TARGET", 
                         tuple(target_img_point[0][0].astype(int) + np.array([15, -10])),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
                 
-                # Визуализация P_target (точка для ориентации - фиолетовая)
+
                 p_target_img, _ = cv2.projectPoints(
                     P_target.reshape(1, 3), 
                     np.zeros((3,1)), 
@@ -295,7 +278,7 @@ def detect_markers():
                 )
 
 
-                # Стрелка от ведомого к целевой позиции следования
+                # arrow slave robot to follow point
                 follower_img, _ = cv2.projectPoints(
                     tvecs[i][0].reshape(1, 3), 
                     np.zeros((3,1)), 
@@ -308,7 +291,7 @@ def detect_markers():
                             tuple(target_img_point[0][0].astype(int)),
                             (0, 255, 255), 2, tipLength=0.3)
                 
-                # Информация на изображении
+                # show id on image
                 cv2.putText(frame, f"ID: {ids[i][0]}", 
                         tuple(follower_img[0][0].astype(int) + np.array([-50, -15])),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
@@ -320,11 +303,5 @@ def detect_markers():
 
 
 if __name__ == "__main__":
-    # threads = [
-    #     threading.Thread(target=read_img,name="Read Image"),
-    #     threading.Thread(target=prepocess_img,name="preproc Image"),
-    #     threading.Thread(target=detect_markers,name="detect markers")
-    # ]
-    # for i in threads:
-    #     i.start()
+
     init()

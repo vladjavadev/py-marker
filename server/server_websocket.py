@@ -23,26 +23,6 @@ def send_stop_robot(robot_dto):
 
 
 
-
-
-async def _send_update_msg(robot_dto):
-    client = s_state.connected_clients[robot_dto.marker.id]
-    event = {
-        "type": "update-pos",
-        "robot": {
-            "marker_id":int(robot_dto.marker.id),
-            "pos":robot_dto.pos.tolist(),
-            "angle":robot_dto.angle.tolist(),
-            "follow_point":robot_dto.follow_point.pos,
-            "deltaPos":{
-                "linear":robot_dto.deltaPos.linear,
-                "angular":robot_dto.deltaPos.angular
-            }
-        }
-    }
-    
-    await client.send(json.dumps(event))
-
 async def _send_stop_robot_msg(robot_dto):
     client = s_state.connected_clients[robot_dto.marker.id]
     async with client:
