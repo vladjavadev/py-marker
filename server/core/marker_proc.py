@@ -48,7 +48,7 @@ except FileNotFoundError:
     # dist_coeffs = ...
     exit() # Або завершити програму, якщо калібрування критично важливе
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 
 def read_img():
     ix = 0
@@ -60,7 +60,7 @@ def read_img():
             pre_proc_frames.clear()
             pre_proc_frames.append(last)
         else:
-            frame = cv2.imread(f"test-img/image{ix+1}.png")
+            _, frame = cap.read()
             pre_proc_frames.append(frame)
             print("reading time: ", time.time()-start)
         ix=(ix+1)%3
@@ -98,7 +98,7 @@ def wait_client(id):
     
     
 def init():
-    frame = cv2.imread("test-img/image3.png")
+    _, frame = cap.read()
 
 
     # Словник маркерів
