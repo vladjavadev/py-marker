@@ -87,7 +87,7 @@ def prepocess_img():
 def wait_client(id):
     s_state.status="wait-clients"
     count = 0
-    max_iteration = 50
+    max_iteration = 20
     while count<max_iteration:
         if id in s_state.connected_clients:
             return True
@@ -98,16 +98,19 @@ def wait_client(id):
     
     
 def init():
-    _, frame = cap.read()
+    ids = []
+    corners = None
+    while ids is None or len(ids)==0:
+        _, frame = cap.read()
 
 
-    # Словник маркерів
-    dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+        # Словник маркерів
+        dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
-    # Детекція маркерів
-    # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Детекція маркерів
+        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    corners, ids, rejected = aruco.detectMarkers(frame, dictionary)
+        corners, ids, rejected = aruco.detectMarkers(frame, dictionary)
 
 
 
@@ -116,9 +119,9 @@ def init():
         _, tvecs, _ = aruco.estimatePoseSingleMarkers(corners, 0.05, camera_matrix, dist_coeffs)
         for i in range(len(ids)):
             id = ids[i][0]
-            # is_connected = wait_client(id)
-            # if not is_connected:
-            #     continue
+            is_connected = wait_client(id)
+            if not is_connected:
+                continue
 
             if id not in robot_dto_dict:
                 marker = Marker(id)
