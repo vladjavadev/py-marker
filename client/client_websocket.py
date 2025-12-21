@@ -189,7 +189,7 @@ class RobotClient:
                 }
                 
                 await websocket.send(json.dumps(event))
-                print(f"Event send: {event}")
+                print("Event send: {event}".format(event=event))
                 
                 try:
                     response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
