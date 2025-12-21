@@ -75,7 +75,7 @@ class RobotClient:
         except ConnectionRefusedError:
             print("Connection refused")
         except Exception as e:
-            print(f"Error: {e}")
+            print("Error: {}".format(e))
     
 
     async def _calculate_and_apply_control(self, pos, angle, follow_point):
@@ -144,7 +144,7 @@ class RobotClient:
         
         # Упрощенный вывод (print может быть узким местом)
         if distance > 50:  # Печатаем только если далеко от цели
-            print(f"v={linear_v:.0f} ω={angular_omega:.2f} d={distance:.0f}mm")
+            print("v={:.0f} ω={:.2f} d={:.0f}mm".format(linear_v, angular_omega, distance))
 
     @staticmethod
     def _normalize_angle(angle):
@@ -162,7 +162,7 @@ class RobotClient:
                 event = {"type": "get-status"}
                 
                 await websocket.send(json.dumps(event))
-                print(f"Event send: {event}")
+                print("Event send: {event}".format(event=event))
                 
                 try:
                     response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
@@ -170,14 +170,14 @@ class RobotClient:
                     if event["type"] == "get-status":
                         if "value" in event:
                             cs.status = event["value"]
-                    print(f"Status: {cs.status}")
+                    print("Status: {cs.status}".format(cs=cs))
                 except asyncio.TimeoutError:
                     print("Server not respond")
                     
         except ConnectionRefusedError:
             print("Connection refused")
         except Exception as e:
-            print(f"Error: {e}")
+            print("Error: {}".format(e))
     
     async def _send_message(self, msg_type: str, message: dict):
         """Send message to WebSocket server."""
@@ -199,7 +199,7 @@ class RobotClient:
                             robot_state = msg["robot"]
                             marker_id = robot_state["marker_id"]
                             cs.robot = Robot(Marker(marker_id))
-                            print(f"Робот инициализирован с marker_id={marker_id}")
+                            print("Робот инициализирован с marker_id={marker_id}".format(marker_id=marker_id))
                             
                 except asyncio.TimeoutError:
                     print("Server not respond")
@@ -207,7 +207,7 @@ class RobotClient:
         except ConnectionRefusedError:
             print("Connection refused")
         except Exception as e:
-            print(f"Error : {e}")
+            print("Error : {}".format(e))
 
 
 async def main():
@@ -258,4 +258,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n\n Program interrupted by user")
     except Exception as e:
-        print(f"\n\nCritical error: {e}")
+        print("\n\nCritical error: {}".format(e))

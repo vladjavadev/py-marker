@@ -46,9 +46,6 @@ class MotorDriver:
         ff_r = max(-100, min(100, ff_r))
         
         # Calculate PWM values (map from 0-100% to pwm_min-pwm_max range)
-        # If duty is 0, PWM should be 0
-        # If duty is 100, PWM should be pwm_max
-        # Scale proportionally
         if abs(ff_l) > 0:
             self.pwm_l = int(self.pwm_min + (abs(ff_l) / 100.0) * (self.pwm_max - self.pwm_min))
         else:
@@ -66,20 +63,20 @@ class MotorDriver:
         # Left wheel
         if ff_l > 0:
             self._state[self.pin_FmotL] = self.pwm_l
-            print(f"[MOCK] Left wheel forward: duty={ff_l:.1f}%, PWM={self.pwm_l}")
+            print("[MOCK] Left wheel forward: duty={:.1f}%, PWM={}".format(ff_l, self.pwm_l))
         elif ff_l < 0:
             self._state[self.pin_BmotL] = self.pwm_l
-            print(f"[MOCK] Left wheel reverse: duty={abs(ff_l):.1f}%, PWM={self.pwm_l}")
+            print("[MOCK] Left wheel reverse: duty={:.1f}%, PWM={}".format(abs(ff_l), self.pwm_l))
         else:
             print("[MOCK] Left wheel stop")
 
         # Right wheel
         if ff_r > 0:
             self._state[self.pin_FmotR] = self.pwm_r
-            print(f"[MOCK] Right wheel forward: duty={ff_r:.1f}%, PWM={self.pwm_r}")
+            print("[MOCK] Right wheel forward: duty={:.1f}%, PWM={}".format(ff_r, self.pwm_r))
         elif ff_r < 0:
             self._state[self.pin_BmotR] = self.pwm_r
-            print(f"[MOCK] Right wheel reverse: duty={abs(ff_r):.1f}%, PWM={self.pwm_r}")
+            print("[MOCK] Right wheel reverse: duty={:.1f}%, PWM={}".format(abs(ff_r), self.pwm_r))
         else:
             print("[MOCK] Right wheel stop")
 
@@ -97,34 +94,34 @@ if __name__ == "__main__":
     # Test 1: Forward motion
     print("Test 1: Forward motion (50% duty)")
     driver.set_wheel_duty(50, 50)
-    print(f"State: {driver.get_state()}\n")
+    print("State: {}\n".format(driver.get_state()))
     
     # Test 2: Turn left (right wheel faster)
     print("Test 2: Turn left")
     driver.set_wheel_duty(30, 70)
-    print(f"State: {driver.get_state()}\n")
+    print("State: {}\n".format(driver.get_state()))
     
     # Test 3: Reverse
     print("Test 3: Reverse")
     driver.set_wheel_duty(-50, -50)
-    print(f"State: {driver.get_state()}\n")
+    print("State: {}\n".format(driver.get_state()))
     
     # Test 4: Rotate in place
     print("Test 4: Rotate in place (one forward, one reverse)")
     driver.set_wheel_duty(-50, 50)
-    print(f"State: {driver.get_state()}\n")
+    print("State: {}\n".format(driver.get_state()))
     
     # Test 5: Stop
     print("Test 5: Stop")
     driver.set_wheel_duty(0, 0)
-    print(f"State: {driver.get_state()}\n")
+    print("State: {}\n".format(driver.get_state()))
     
     # Test 6: Maximum duty
     print("Test 6: Maximum duty (100%)")
     driver.set_wheel_duty(100, 100)
-    print(f"State: {driver.get_state()}\n")
+    print("State: {}\n".format(driver.get_state()))
     
     # Test 7: Low duty
     print("Test 7: Low duty (10%)")
     driver.set_wheel_duty(10, 10)
-    print(f"State: {driver.get_state()}\n")
+    print("State: {}\n".format(driver.get_state()))
