@@ -189,7 +189,7 @@ class RobotClient:
                 }
                 
                 await websocket.send(json.dumps(event))
-                print("Event send: {event}".format(event=event))
+                print("Event send: {event}".format(event=event))    
                 
                 try:
                     response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
@@ -239,7 +239,7 @@ async def main():
     
     
     print("Start movement")
-    while cs.status == "update-pos":
+    while True:
         # Calls update_pos which internally:
         # - Updates cs.robot (Robot class from robot_dto.py)
         # - Calls SlaveController methods (from servant_controller.py)
