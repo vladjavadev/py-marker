@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Integrated WebSocket client with robot motor control."""
 import asyncio
-from websockets.asyncio.client import connect
+import websockets
 import json
 from data.robot_dto import Robot
 from data.marker import Marker
@@ -37,7 +37,7 @@ class RobotClient:
     async def update_pos(self):
         """Fetch robot position from server and update control."""
         try:
-            async with connect(uri) as websocket:
+            async with websockets.connect(uri) as websocket:
                 event = {
                     "type": "update-pos",
                     "robot": {
@@ -158,7 +158,7 @@ class RobotClient:
     async def get_status(self):
         """Fetch connection status from server."""
         try:
-            async with connect(uri) as websocket:
+            async with websockets.connect(uri) as websocket:
                 event = {"type": "get-status"}
                 
                 await websocket.send(json.dumps(event))
@@ -182,7 +182,7 @@ class RobotClient:
     async def _send_message(self, msg_type: str, message: dict):
         """Send message to WebSocket server."""
         try:
-            async with connect(uri) as websocket:
+            async with websockets.connect(uri) as websocket:
                 event = {
                     "type": msg_type,
                     **message
