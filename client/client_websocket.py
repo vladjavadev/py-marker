@@ -218,7 +218,7 @@ async def main():
     robot_client = RobotClient(v_max=rk.speeds[-1])
     while cs.status=="start-client":
         await robot_client.get_status()
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(4.0)
     
     # Get marker ID from user
     marker_id = cs.marker_id
