@@ -224,8 +224,10 @@ async def main():
     marker_id = cs.marker_id
     
     # Initialize marker on server (calls Marker class from marker.py)
-    marker = Marker(marker_id)
-    await robot_client.init_marker(marker)
+    while cs.robot is None:
+        marker = Marker(marker_id)
+        await robot_client.init_marker(marker)
+        await asyncio.sleep(2.0)
     
     print("init...")
     time.sleep(6)
