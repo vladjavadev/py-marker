@@ -94,6 +94,13 @@ def wait_client(id):
     
     
 def init():
+    if not cap.isOpened():
+        print("Camera is not opened!")
+        cap.release()
+        cap = cv2.VideoCapture(1)
+        return
+    
+    s_state.camera_is_on = True
     ids = []
     corners = None
     while ids is None or len(ids)==0:

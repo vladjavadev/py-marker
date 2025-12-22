@@ -53,22 +53,23 @@ async def echo(websocket:ServerConnection):
     if event["type"] == "update-pos":
         if "robot" in event:
             id = event["robot"]["marker_id"]
-            updated_robot = s_state.robot_new_values[id]
-            msg = {
-                "type": "update-pos",
-                "robot": {
-                    "marker_id":int(updated_robot.marker.id),
-                    "pos":updated_robot.pos.tolist(),
-                    "angle":updated_robot.angle.tolist(),
-                    "follow_point":updated_robot.follow_point.pos,
-                    "deltaPos":{
-                        "linear":updated_robot.deltaPos.linear,
-                        "angular":updated_robot.deltaPos.angular
+            if id in s_state.robot_new_values: 
+                updated_robot = s_state.robot_new_values[id]
+                msg = {
+                    "type": "update-pos",
+                    "robot": {
+                        "marker_id":int(updated_robot.marker.id),
+                        "pos":updated_robot.pos.tolist(),
+                        "angle":updated_robot.angle.tolist(),
+                        "follow_point":updated_robot.follow_point.pos,
+                        "deltaPos":{
+                            "linear":updated_robot.deltaPos.linear,
+                            "angular":updated_robot.deltaPos.angular
+                        }
                     }
                 }
-            }
 
-        await websocket.send(json.dumps(msg))    
+                await websocket.send(json.dumps(msg))    
    
     # assert event["type"] == "start"
     if event["type"] == "init-marker":
@@ -82,11 +83,16 @@ async def echo(websocket:ServerConnection):
             }
             marker_id = event["robot"]["marker_id"]
             s_state.connected_clients[marker_id] = websocket
-            await websocket.send(json.dumps(init_marker_msg))
  
             if s_state.init_thread == None:
                 s_state.init_thread = threading.Thread(target=m.init,name="init-marker")
                 s_state.init_thread.start()
+            await asyncio.sleep(2.0)
+            if s_state.camera_is_on:
+                await websocket.send(json.dumps(init_marker_msg))
+            else:
+                s_state.init_thread = None
+
                 
 
                 
