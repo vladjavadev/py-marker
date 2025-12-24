@@ -1,34 +1,61 @@
-
+from core.motor_driver import MotorDriver
+from typing import List
 import time
-import math
-from client.motor_driver import MotorDriver
-import kinematic as rk
 
 
-class Controller:
 
-    unit = 200#mm
+class RouteNode:
+    def __init__(self, lm, rm, delay):
+        self.left_motor = lm
+        self.right_motor = rm
+        self.delay = delay
+
+class MotorController:
+    def __init__(self,route:List[RouteNode]):
+        self.driver = MotorDriver(v_max=100)  # Example max velocity
+        self.route = route
+        self.node_ix = 0
+        self.paused = False
+        self.stopped = False
+
+    def run(self):
+        while self.node_ix < len(self.route):
+
+            if self.paused:
+                self.driver.stop() 
+                while self.paused:
+                    print("Paused...")
+                    time.sleep(0.1)
+
+            if self.stopped:
+                self.driver.stop()
+                return False
+
+            self.next_node()
+        return True
     
-    def __init__(self):
-        self.v_max = rk.speeds[4]
-        self.md = MotorDriver(self.v_max)
-        self.linear_speed = rk.speeds[2]
+
+    def next_node(self):
+
+        node = self.route[self.node_ix]
+        self.driver.set_velocity(node.left_motor, node.right_motor)
+        time.sleep(node.delay)
+        self.node_ix += 1
+
+    def stop(self):
+        self.driver.stop()
 
 
-    def clamp_speed(self, speed):
-        clamped_speed = 0
-        if(speed<=self.v_max and speed>=-self.v_max):
-            clamped_speed = speed
-        else:
-            if(speed<-self.v_max):
-                clamped_speed = -self.v_max
-            else:
-                clamped_speed = self.v_max
 
-        return clamped_speed
+if __name__ == "__main__":
+    route_list = [
+    RouteNode(50,50,10),
+    RouteNode(-50,-50,2),
+    RouteNode(-30,50,10),
+    RouteNode(0,0,2),
+    RouteNode(60,-50,1),
+    RouteNode(80,80,10),
 
-
-    def move(self):
-        vl = self.linear_speed-self.omega*rk.LwheelBase
-        
-    
+]
+    controller = MotorController(route_list)
+    controller.run()

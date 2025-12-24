@@ -57,27 +57,28 @@ def read_img():
             pre_proc_frames.append(last)
         else:
             _, frame = cap.read()
+            # frame = cv2.resize(frame, (320, 240))
+            # frame = frame[0:120, :]
             pre_proc_frames.append(frame)
             print("reading time: ", time.time()-start)
         ix=(ix+1)%3
         
 
 
-def prepocess_img():
-    while True:
-        time.sleep(0.1)
-        start = time.time()
-        if len(post_proc_frames)==post_proc_frames.maxlen:
-            last = post_proc_frames.pop()
-            post_proc_frames.clear()
-            post_proc_frames.append(last)
-        if len(pre_proc_frames)>0:
-            frame = pre_proc_frames.pop()
-            # frame = cv2.resize(frame, (320, 240))
-            # frame = frame[0:120, :]
-            post_proc_frames.append(frame)
+# def prepocess_img():
+#     while True:
+#         time.sleep(0.1)
+#         start = time.time()
+#         if len(post_proc_frames)==post_proc_frames.maxlen:
+#             last = post_proc_frames.pop()
+#             post_proc_frames.clear()
+#             post_proc_frames.append(last)
+#         if len(pre_proc_frames)>0:
+#             frame = pre_proc_frames.pop()
+
+#             post_proc_frames.append(frame)
        
-            print("preproc time: ", time.time()-start)
+#             print("preproc time: ", time.time()-start)
 
 
 def wait_client(id):
@@ -94,10 +95,11 @@ def wait_client(id):
     
     
 def init():
+    global cap
     if not cap.isOpened():
         print("Camera is not opened!")
         cap.release()
-        cap = cv2.VideoCapture(1)
+        cap = cv2.VideoCapture(0)
         return
     
     s_state.camera_is_on = True
@@ -150,15 +152,15 @@ def init():
                 target_fp.available=False
                 robot.follow_point = target_fp
 
-    time.sleep(0.15)
-    print("RUN THREADS")
-    threads = [
-        threading.Thread(target=read_img,name="Read Image"),
-        threading.Thread(target=prepocess_img,name="preproc Image"),
-        threading.Thread(target=detect_markers,name="detect markers")
-    ]
-    for i in threads:
-        i.start()
+        time.sleep(0.15)
+        print("RUN THREADS")
+        threads = [
+            threading.Thread(target=read_img,name="Read Image"),
+            # threading.Thread(target=prepocess_img,name="preproc Image"),
+            threading.Thread(target=detect_markers,name="detect markers")
+        ]
+        for i in threads:
+            i.start()
 
 
 
@@ -219,8 +221,8 @@ def detect_markers():
 
                 R_marker, _ = cv2.Rodrigues(rvecs[i])
                 R_camera = R_target
-                print(f"Rmarker: {R_marker}")
-                print(f"Rcamera: {R_camera}")
+                # print(f"Rmarker: {R_marker}")
+                # print(f"Rcamera: {R_camera}")
                 R_delta = R_camera @ R_marker.T
 
                 #calc rotation angle theta
@@ -229,11 +231,11 @@ def detect_markers():
 
                 y_axis  = R_delta[0,2]-R_delta[2,0]/(2*np.sin(theta))
 
-                print(f"Rdelta: {y_axis}")
+                # print(f"Rdelta: {y_axis}")
 
                 distance = np.linalg.norm(P_target - tvec)
 
-                print(f"distances: {distance}")
+                # print(f"distances: {distance}")
                 robot.deltaPos = DeltaPos()
                 robot.deltaPos.linear = distance
                 robot.deltaPos.angular = y_axis
@@ -242,68 +244,68 @@ def detect_markers():
                 s_state.robot_new_values[marker_id] = robot
                 _lock.release()
 
-                target_img_point, _ = cv2.projectPoints(
-                    P_target.reshape(1, 3), 
-                    np.zeros((3,1)), 
-                    np.zeros((3,1)), 
-                    camera_matrix, 
-                    dist_coeffs
-                )
+        #         target_img_point, _ = cv2.projectPoints(
+        #             P_target.reshape(1, 3), 
+        #             np.zeros((3,1)), 
+        #             np.zeros((3,1)), 
+        #             camera_matrix, 
+        #             dist_coeffs
+        #         )
                 
-                cv2.circle(frame, 
-                        tuple(target_img_point[0][0].astype(int)), 
-                        10, (255, 255, 0), -1)  
-                cv2.putText(frame, "FOLLOW TARGET", 
-                        tuple(target_img_point[0][0].astype(int) + np.array([15, -10])),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+        #         cv2.circle(frame, 
+        #                 tuple(target_img_point[0][0].astype(int)), 
+        #                 10, (255, 255, 0), -1)  
+        #         cv2.putText(frame, "FOLLOW TARGET", 
+        #                 tuple(target_img_point[0][0].astype(int) + np.array([15, -10])),
+        #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
                 
 
-                p_target_img, _ = cv2.projectPoints(
-                    P_target.reshape(1, 3), 
-                    np.zeros((3,1)), 
-                    np.zeros((3,1)), 
-                    camera_matrix, 
-                    dist_coeffs
-                )
+        #         p_target_img, _ = cv2.projectPoints(
+        #             P_target.reshape(1, 3), 
+        #             np.zeros((3,1)), 
+        #             np.zeros((3,1)), 
+        #             camera_matrix, 
+        #             dist_coeffs
+        #         )
                 
-                cv2.circle(frame, 
-                        tuple(p_target_img[0][0].astype(int)), 
-                        8, (255, 0, 255), -1)  # Фиолетовая точка
-                cv2.putText(frame, "ORIENT TARGET", 
-                        tuple(p_target_img[0][0].astype(int) + np.array([15, 10])),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
+        #         cv2.circle(frame, 
+        #                 tuple(p_target_img[0][0].astype(int)), 
+        #                 8, (255, 0, 255), -1)  # Фиолетовая точка
+        #         cv2.putText(frame, "ORIENT TARGET", 
+        #                 tuple(p_target_img[0][0].astype(int) + np.array([15, 10])),
+        #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
                 
-                dist_mm = distance*1000
-                cv2.putText(
-                    frame,
-                    f"dist: {dist_mm:.2f}",   # обрезаем до 2 знаков после запятой
-                    tuple(p_target_img[0][0].astype(int) + np.array([15, 100])),     # позиция текста: слева внизу
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 0, 255),
-                    2
-                )
+        #         dist_mm = distance*1000
+        #         cv2.putText(
+        #             frame,
+        #             f"dist: {dist_mm:.2f}",   # обрезаем до 2 знаков после запятой
+        #             tuple(p_target_img[0][0].astype(int) + np.array([15, 100])),     # позиция текста: слева внизу
+        #             cv2.FONT_HERSHEY_SIMPLEX,
+        #             0.7,
+        #             (255, 0, 255),
+        #             2
+        #         )
 
 
-                # arrow slave robot to follow point
-                follower_img, _ = cv2.projectPoints(
-                    tvecs[i][0].reshape(1, 3), 
-                    np.zeros((3,1)), 
-                    np.zeros((3,1)), 
-                    camera_matrix, 
-                    dist_coeffs
-                )
-                cv2.arrowedLine(frame, 
-                            tuple(follower_img[0][0].astype(int)),
-                            tuple(target_img_point[0][0].astype(int)),
-                            (0, 255, 255), 2, tipLength=0.3)
+        #         # arrow slave robot to follow point
+        #         follower_img, _ = cv2.projectPoints(
+        #             tvecs[i][0].reshape(1, 3), 
+        #             np.zeros((3,1)), 
+        #             np.zeros((3,1)), 
+        #             camera_matrix, 
+        #             dist_coeffs
+        #         )
+        #         cv2.arrowedLine(frame, 
+        #                     tuple(follower_img[0][0].astype(int)),
+        #                     tuple(target_img_point[0][0].astype(int)),
+        #                     (0, 255, 255), 2, tipLength=0.3)
                 
-                # show id on image
-                cv2.putText(frame, f"ID: {ids[i][0]}", 
-                        tuple(follower_img[0][0].astype(int) + np.array([-50, -15])),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        #         # show id on image
+        #         cv2.putText(frame, f"ID: {ids[i][0]}", 
+        #                 tuple(follower_img[0][0].astype(int) + np.array([-50, -15])),
+        #                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
-        cv2.imshow("result", frame)
+        # cv2.imshow("result", frame)
         print(f"Time: {time.time()-start:.4f} сек")
         if cv2.waitKey(1) == ord('q'):
             break
