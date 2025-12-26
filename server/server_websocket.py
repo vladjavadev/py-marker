@@ -14,6 +14,28 @@ import data.server_state as s_state
 
 ip="0.0.0.0"
 
+client_events = {}
+
+async def wait_client(id, timeout=5):
+    event = client_events.setdefault(id, asyncio.Event())
+    try:
+        await asyncio.wait_for(event.wait(), timeout)
+        print(f"Client {id} connected!")
+        return True
+    except asyncio.TimeoutError:
+        print(f"Client {id} did not connect within {timeout} seconds.")
+        return False
+    
+async def connect_client(id, delay=2):
+    await asyncio.sleep(delay)
+    event = client_events.setdefault(id, asyncio.Event())
+    event.set()
+    print(f"Event for client {id} set.")
+
+    
+
+
+
 def send_stop_robot(robot_dto):
     if robot_dto.marker.id in s_state.connected_clients:
         asyncio.run_coroutine_threadsafe(
