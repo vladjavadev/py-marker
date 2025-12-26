@@ -16,7 +16,8 @@ import numpy as np
 
 
 # WebSocket URI
-uri = "ws://localhost:8765"
+uri = "ws://192.168.239.178:8765"
+# uri = "ws://localhost:8765"
 
 
 class RobotClient:
