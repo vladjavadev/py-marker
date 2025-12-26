@@ -33,7 +33,7 @@ dt = 0.05
 
 try:
     # Завантажуємо дані з файлу, створеного скриптом калібрування
-    calibration_data = np.load('server/data/camera_params.npz')
+    calibration_data = np.load('data/camera_params.npz')
     
     # Витягуємо матрицю камери та коефіцієнти спотворення
     camera_matrix = calibration_data['mtx']
@@ -49,7 +49,7 @@ except FileNotFoundError:
     # dist_coeffs = ...
     exit() # Або завершити програму, якщо калібрування критично важливе
 
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 
 def read_img():
     _lock = threading.Lock()
@@ -101,7 +101,7 @@ def init():
     while cap.isOpened()==False:
         cap.release()
         time.sleep(1.0)
-        cap = cv2.VideoCapture(1)
+        cap = cv2.VideoCapture(0)
     s_state.camera_is_on = True
     while len(ids)<3:
         _, frame = cap.read()
