@@ -251,7 +251,7 @@ def detect_markers():
 
                     print(f"distances: {distance}")
                 print_counter=(print_counter+1)%20
-                
+
                 robot.deltaPos = DeltaPos()
                 robot.deltaPos.linear = distance
                 robot.deltaPos.angular = y_axis
@@ -317,10 +317,12 @@ def detect_markers():
                         tuple(follower_img[0][0].astype(int) + np.array([-50, -15])),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
-        cv2.imshow("result", frame)
-        print(f"Time: {time.time()-start:.4f} сек")
-        if cv2.waitKey(1) == ord('q'):
-            break
+        if print_counter==0:
+            cv2.imshow("result", frame)
+
+            print(f"Time: {time.time()-start:.4f} сек")
+            if cv2.waitKey(1) == ord('q'):
+                break
 
 
 if __name__ == "__main__":
