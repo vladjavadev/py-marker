@@ -178,12 +178,15 @@ def init():
 def detect_markers():
     s_state.status="update-pos"
     print_counter = 0
+    _lock = threading.Lock()
     while True:
         time.sleep(0.1)
         start = time.time()
         if len(pre_proc_frames)==0:
             continue
+        _lock.acquire()
         frame = pre_proc_frames.pop()
+        _lock.release()
 
 
         # Словник маркерів
@@ -318,7 +321,7 @@ def detect_markers():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
         if print_counter==0:
-            cv2.imshow("result", frame)
+            # cv2.imshow("result", frame)
 
             print(f"Time: {time.time()-start:.4f} сек")
             if cv2.waitKey(1) == ord('q'):
