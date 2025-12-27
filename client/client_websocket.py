@@ -144,7 +144,7 @@ class RobotClient:
         self.controller.update()
         
         # Упрощенный вывод (print может быть узким местом)
-        if distance > 50:  # Печатаем только если далеко от цели
+        if distance > 100:  # Печатаем только если далеко от цели
             print("v={:.0f} ω={:.2f} d={:.0f}mm".format(linear_v, angular_omega, distance))
 
     @staticmethod
