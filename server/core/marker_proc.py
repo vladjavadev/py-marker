@@ -177,7 +177,7 @@ def init():
 
 def detect_markers():
     s_state.status="update-pos"
-
+    print_counter = 0
     while True:
         time.sleep(0.1)
         start = time.time()
@@ -232,8 +232,7 @@ def detect_markers():
                 # cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvec_target, tvecs[i], 0.05)
                 R_marker, _ = cv2.Rodrigues(rvecs[i])
                 R_camera = R_target
-                print(f"Rmarker: {R_marker}")
-                print(f"Rcamera: {R_camera}")
+
                 R_delta = R_camera @ R_marker.T
 
                 #calc rotation angle theta
@@ -242,11 +241,17 @@ def detect_markers():
 
                 y_axis  = R_delta[0,2]-R_delta[2,0]/(2*np.sin(theta))
 
-                print(f"Rdelta: {y_axis}")
 
                 distance = np.linalg.norm(P_target - tvec)
+                if print_counter==0:
+                    print(f"Rmarker: {R_marker}")
+                    print(f"Rcamera: {R_camera}")
 
-                print(f"distances: {distance}")
+                    print(f"Rdelta: {y_axis}")
+
+                    print(f"distances: {distance}")
+                print_counter=(print_counter+1)%20
+                
                 robot.deltaPos = DeltaPos()
                 robot.deltaPos.linear = distance
                 robot.deltaPos.angular = y_axis
