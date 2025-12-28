@@ -164,14 +164,8 @@ def init():
 
     time.sleep(0.15)
     s_state.robot_new_values = robot_dto_dict
-    print("RUN THREADS")
-    threads = [
-        threading.Thread(target=read_img,name="Read Image"),
-        # threading.Thread(target=prepocess_img,name="preproc Image"),
-        threading.Thread(target=detect_markers,name="detect markers")
-    ]
-    for i in threads:
-        i.start()
+    threading.Thread(target=read_img,name="Read Image").start()
+
 
 
 
@@ -330,12 +324,8 @@ def detect_markers():
             break
 
 
-if __name__ == "__main__":
-    # threads = [
-    #     threading.Thread(target=read_img,name="Read Image"),
-    #     threading.Thread(target=prepocess_img,name="preproc Image"),
-    #     threading.Thread(target=detect_markers,name="detect markers")
-    # ]
-    # for i in threads:
-    #     i.start()
+def run():
+    while s_state.status=="start-server":
+        time.sleep(0.5)
     init()
+    detect_markers()

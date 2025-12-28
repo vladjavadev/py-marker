@@ -105,15 +105,12 @@ async def echo(websocket:ServerConnection):
             }
             marker_id = event["robot"]["marker_id"]
             s_state.connected_clients[marker_id] = websocket
- 
-            if s_state.init_thread == None:
-                s_state.init_thread = threading.Thread(target=m.init,name="init-marker")
-                s_state.init_thread.start()
+            s_state.status="initialized"
             await asyncio.sleep(2.0)
             if s_state.camera_is_on:
                 await websocket.send(json.dumps(init_marker_msg))
             else:
-                s_state.init_thread = None
+                s_state.status="start-server"
 
                 
 
