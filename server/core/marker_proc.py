@@ -1,3 +1,4 @@
+from turtle import title
 import cv2
 import cv2.aruco as aruco
 import numpy as np
@@ -321,11 +322,12 @@ def detect_markers():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
         if print_counter==0:
-            # cv2.imshow("result", frame)
+            cv2.imshow("result", frame)
+            cv2.setWindowProperty("result", cv2.WND_PROP_TOPMOST, 1)
 
             print(f"Time: {time.time()-start:.4f} сек")
-            if cv2.waitKey(1) == ord('q'):
-                break
+        if cv2.waitKey(1) == ord('q'):
+            break
 
 
 if __name__ == "__main__":
