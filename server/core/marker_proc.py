@@ -295,6 +295,16 @@ def detect_markers():
                 )
 
 
+                cv2.putText(
+                    frame,
+                    f"Rdelta: {R_delta:.2f}",   # обрезаем до 2 знаков после запятой
+                    tuple(p_target_img[0][0].astype(int) + np.array([15, -20])),     # позиция текста: слева внизу
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (255, 0, 255),
+                    2
+                )
+
                 # Стрелка от ведомого к целевой позиции следования
                 follower_img, _ = cv2.projectPoints(
                     tvecs[i][0].reshape(1, 3), 
