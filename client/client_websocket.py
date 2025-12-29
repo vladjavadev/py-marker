@@ -16,9 +16,11 @@ import numpy as np
 
 
 # WebSocket URI
-uri = "ws://192.168.239.178:8765"
+uri = "ws://192.168.0.80:8765"
+# uri = "ws://192.168.239.178:8765"
 # uri = "ws://localhost:8765"
 
+last_theta =0
 
 class RobotClient:
     """Integrated robot client with WebSocket communication and motor control."""
@@ -57,16 +59,17 @@ class RobotClient:
                         if "robot" in msg:
                             robot_state = msg["robot"]
                             pos = robot_state["pos"]
-                            angle = robot_state["angle"]
+                            dir =  robot_state["dir"]
+                            target_dir = robot_state["target_dir"]
                             fp = robot_state.get("follow_point")
                             
                             # Update robot state
-                            cs.robot.update_pos(pos, angle)
+                            cs.robot.update_pos(pos, dir,target_dir)
                             if fp:
                                 cs.robot.update_fp(fp)
                             
                             # Calculate and apply motor control
-                            await self._calculate_and_apply_control(pos, angle, fp)
+                            await self._calculate_and_apply_control(pos, dir,target_dir, fp)
                             
                             # print(f"New pos: {pos}, angle: {angle}")
                             
@@ -79,7 +82,7 @@ class RobotClient:
             print("Error: {}".format(e))
     
 
-    async def _calculate_and_apply_control(self, pos, angle, follow_point):
+    async def _calculate_and_apply_control(self, pos, dir, target_dir, follow_point):
         """Calculate motor velocities based on position and target using rotation vectors."""
         if follow_point is None:
             self.controller.set_target_velocity(0.0, 0.0)
@@ -87,13 +90,11 @@ class RobotClient:
             return
         
         # Convert inputs to numpy arrays (минимизируем создание массивов)
-        pos = np.asarray(pos, dtype=np.float32)
-        follow_point = np.asarray(follow_point, dtype=np.float32)
-        rvec = np.asarray(angle, dtype=np.float32)
-        
-        # --- УПРОЩЕННЫЙ ПОДХОД ДЛЯ 2D РОБОТА ---
-        # Вместо полных 3D матриц используем 2D геометрию
-        
+        theta = np.arctan2(
+            np.cross(dir, target_dir)[1],
+            np.dot(dir, target_dir)
+        )
+
         # Вектор к цели в горизонтальной плоскости
         dx = follow_point[0] - pos[0]
         dz = follow_point[2] - pos[2]
@@ -105,24 +106,10 @@ class RobotClient:
             self.controller.update()
             return
         
-        # Целевой угол (atan2 быстрее матричных операций)
-        target_angle = np.arctan2(dx, dz)
-        
-        # Текущий угол робота из rotation vector
-        # Для 2D достаточно Y-компоненты rvec
-        theta = np.linalg.norm(rvec)
         
         if theta < 1e-6:
             current_angle = 0.0
-        else:
-            # Упрощенное извлечение угла поворота вокруг Y
-            # Для малых углов: угол ≈ rvec[1]
-            current_angle = rvec[1] if theta < 0.1 else np.arctan2(rvec[0], rvec[2])
-        
-        # Разница углов (нормализованная)
-        angle_diff = target_angle - current_angle
-        # Нормализация в [-π, π]
-        angle_diff = np.arctan2(np.sin(angle_diff), np.cos(angle_diff))
+
         
         # --- УПРАВЛЕНИЕ ---
         LINEAR_GAIN = 2.0
@@ -130,13 +117,13 @@ class RobotClient:
         TURN_THRESHOLD = 0.5  # ~30 градусов
         
         # Угловая скорость
-        angular_omega = angle_diff * ANGULAR_GAIN
+        angular_omega = 0-theta * ANGULAR_GAIN
         
         # Линейная скорость с ограничением
         linear_v = min(distance * LINEAR_GAIN, self.controller.v_max)
         
         # Замедление при резких поворотах
-        if abs(angle_diff) > TURN_THRESHOLD:
+        if abs(theta) > TURN_THRESHOLD:
             linear_v *= 0.5
         
         # Применение управления
