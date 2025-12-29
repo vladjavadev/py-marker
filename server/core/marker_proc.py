@@ -34,7 +34,7 @@ dt = 0.05
 
 try:
     # Завантажуємо дані з файлу, створеного скриптом калібрування
-    calibration_data = np.load('server/data/camera_params.npz')
+    calibration_data = np.load('data/camera_params.npz')
     
     # Витягуємо матрицю камери та коефіцієнти спотворення
     camera_matrix = calibration_data['mtx']
