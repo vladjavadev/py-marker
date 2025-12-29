@@ -297,7 +297,7 @@ def detect_markers():
 
                 cv2.putText(
                     frame,
-                    f"Rdelta: {R_delta:.2f}",   # обрезаем до 2 знаков после запятой
+                    f"Rdelta: {y_axis:.2f}",   # обрезаем до 2 знаков после запятой
                     tuple(p_target_img[0][0].astype(int) + np.array([15, -20])),     # позиция текста: слева внизу
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
