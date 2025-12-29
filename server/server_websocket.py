@@ -82,14 +82,11 @@ async def echo(websocket:ServerConnection):
                     "robot": {
                         "marker_id":int(updated_robot.marker.id),
                         "pos":updated_robot.pos.tolist(),
-                        "angle":updated_robot.angle.tolist(),
                         "follow_point":updated_robot.follow_point.pos,
-                        "deltaPos":{
-                            "linear":updated_robot.deltaPos.linear,
-                            "angular":updated_robot.deltaPos.angular
+                        "dir":updated_robot.dir.tolist(),
+                        "target_dir":updated_robot.target_dir.tolist(),
                         }
                     }
-                }
 
                 await websocket.send(json.dumps(msg))    
    

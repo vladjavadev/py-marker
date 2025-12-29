@@ -34,7 +34,7 @@ dt = 0.05
 
 try:
     # Завантажуємо дані з файлу, створеного скриптом калібрування
-    calibration_data = np.load('data/camera_params.npz')
+    calibration_data = np.load('server/data/camera_params.npz')
     
     # Витягуємо матрицю камери та коефіцієнти спотворення
     camera_matrix = calibration_data['mtx']
@@ -208,49 +208,38 @@ def detect_markers():
                 
                 # Вычисление целевой ориентации
                 robot = robot_dto_dict[ids[i][0]]
-                robot.pos = tvec
-                robot.angle = rvecs[i][0]
+                pos = tvec
+                
 
-                P_target =  np.array(robot.follow_point.pos)
-                V_up = np.array([0, 1, 0])  # Вектор "вверх"
-                
-                # Вычисление осей целевой ориентации
-                Z_target = P_target - tvec
-                Z_target_unit = Z_target / np.linalg.norm(Z_target)
-                
-                X_target = np.cross(Z_target_unit, V_up)
-                X_target_unit = X_target / np.linalg.norm(X_target)
-                
-                Y_target_unit = np.cross(Z_target_unit, X_target_unit)
-                
-                # Построение матрицы поворота
-                R_target = np.column_stack((X_target_unit, Y_target_unit, Z_target_unit))
-
-
-                # Рисуем целевые оси (зеленые)
-                # cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvec_target, tvecs[i], 0.05)
                 R_marker, _ = cv2.Rodrigues(rvecs[i])
-                R_camera = R_target
+                P_target = np.array(robot.follow_point.pos)
 
-                R_delta = R_camera @ R_marker.T
+                # Направление к целевой точке
+                direction_to_target = P_target - tvec
+                direction_to_target[1] = 0  # Проецируем на горизонтальную плоскость
+                direction_to_target = direction_to_target / np.linalg.norm(direction_to_target)
 
-                #calc rotation angle theta
-                #np trace - sum of diagonal elements matrix
-                theta  = np.arccos((np.trace(R_delta)-1)/2)
+                # Текущее направление маркера (ось Z в системе маркера)
+                current_direction = R_marker[:, 2]  # Третий столбец - ось Z
+                current_direction[1] = 0  # Проецируем на горизонтальную плоскость
+                current_direction = current_direction / np.linalg.norm(current_direction)
+                # Convert inputs to numpy arrays (минимизируем создание массивов)
+                theta = np.arctan2(
+                    np.cross(current_direction, direction_to_target)[1],
+                    np.dot(current_direction, direction_to_target)
+                )
+                # Угол между направлениями
 
-                y_axis  = R_delta[0,2]-R_delta[2,0]/(2*np.sin(theta))
-
-
-                distance = np.linalg.norm(P_target - tvec)
                 if print_counter==0:
                     print(f"Rmarker: {R_marker}")
-                    print(f"Rcamera: {R_camera}")
 
-                    print(f"Rdelta: {y_axis}")
+                dx = P_target[0] - pos[0]
+                dz = P_target[2] - pos[2]
+                distance = np.sqrt(dx*dx + dz*dz) * 1000  # mm
 
-                robot.deltaPos = DeltaPos()
-                robot.deltaPos.linear = distance
-                robot.deltaPos.angular = y_axis
+                robot.pos = pos
+                robot.dir = current_direction
+                robot.target_dir = direction_to_target
 
                 target_img_point, _ = cv2.projectPoints(
                     P_target.reshape(1, 3), 
@@ -283,10 +272,10 @@ def detect_markers():
                         tuple(p_target_img[0][0].astype(int) + np.array([15, 10])),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
                 
-                dist_mm = distance*1000
+
                 cv2.putText(
                     frame,
-                    f"dist: {dist_mm:.2f}",   # обрезаем до 2 знаков после запятой
+                    f"dist: {distance:.2f}",   # обрезаем до 2 знаков после запятой
                     tuple(p_target_img[0][0].astype(int) + np.array([15, 100])),     # позиция текста: слева внизу
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
@@ -297,7 +286,7 @@ def detect_markers():
 
                 cv2.putText(
                     frame,
-                    f"Rdelta: {R_delta[1]:.2f}",   # обрезаем до 2 знаков после запятой
+                    f"Rdelta: {theta:.2f}",   # обрезаем до 2 знаков после запятой
                     tuple(p_target_img[0][0].astype(int) + np.array([15, -20])),     # позиция текста: слева внизу
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
