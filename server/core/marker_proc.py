@@ -164,7 +164,7 @@ def init():
 
     time.sleep(0.15)
     s_state.robot_new_values = robot_dto_dict
-    threading.Thread(target=read_img,name="Read Image").start()
+    # threading.Thread(target=read_img,name="Read Image").start()
 
 
 
