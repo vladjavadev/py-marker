@@ -173,15 +173,16 @@ def init():
 def detect_markers():
     s_state.status="update-pos"
     print_counter = 0
-    _lock = threading.Lock()
+    # _lock = threading.Lock()
     while True:
         time.sleep(0.1)
         start = time.time()
-        if len(pre_proc_frames)==0:
-            continue
-        _lock.acquire()
-        frame = pre_proc_frames.pop()
-        _lock.release()
+        _ , frame = cap.read()
+        # if len(pre_proc_frames)==0:
+        #     continue
+        # _lock.acquire()
+        # frame = pre_proc_frames.pop()
+        # _lock.release()
 
 
         # Словник маркерів
@@ -247,9 +248,6 @@ def detect_markers():
 
                     print(f"Rdelta: {y_axis}")
 
-                    print(f"distances: {distance}")
-                print_counter=(print_counter+1)%20
-
                 robot.deltaPos = DeltaPos()
                 robot.deltaPos.linear = distance
                 robot.deltaPos.angular = y_axis
@@ -314,6 +312,8 @@ def detect_markers():
                 cv2.putText(frame, f"ID: {ids[i][0]}", 
                         tuple(follower_img[0][0].astype(int) + np.array([-50, -15])),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                
+                print_counter=(print_counter+1)%5
 
         if print_counter==0:
             cv2.imshow("result", frame)
