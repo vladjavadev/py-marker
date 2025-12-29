@@ -101,7 +101,7 @@ class RobotClient:
         distance = np.sqrt(dx*dx + dz*dz) * 1000  # mm
         
         # Проверка близости к цели
-        if distance < 20.0:  # STOP_THRESHOLD_MM
+        if distance < 50.0:  # STOP_THRESHOLD_MM
             self.controller.set_target_velocity(0.0, 0.0)
             self.controller.update()
             return
@@ -203,7 +203,7 @@ async def main():
     print("=== Start client robot ===")
     
     # Initialize robot client with max velocity from kinematic module
-    robot_client = RobotClient(v_max=rk.speeds[-1])
+    robot_client = RobotClient(v_max=rk.speeds[3])
     while cs.status=="start-client":
         await robot_client.get_status()
         await asyncio.sleep(4.0)

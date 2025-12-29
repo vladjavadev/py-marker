@@ -13,8 +13,8 @@ class MotorDriver:
     """Real MotorDriver for BeagleBone Black hardware with TB6612FNG driver"""
     
     # PWM pins
-    pin_PWMA = "P9_21"  # PWM for Motor A (left motor)
-    pin_PWMB = "P9_22"  # PWM for Motor B (right motor)
+    pin_PWMA = "P9_14"  # PWM for Motor A (left motor)
+    pin_PWMB = "P9_16"  # PWM for Motor B (right motor)
     
     # Motor A (left) direction control pins
     pin_AIN1 = "P9_27"  # Motor A input 1
