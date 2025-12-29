@@ -121,10 +121,10 @@ def init():
 
         time.sleep(0.1)
         
-        cv2.imshow("result", frame)
+    #     cv2.imshow("result", frame)
         print(f"Time: {time.time()-start:.4f} сек")
-        cv2.waitKey(1)
-    cv2.destroyWindow("result")
+    #     cv2.waitKey(1)
+    # cv2.destroyWindow("result")
 
 
 
@@ -314,9 +314,9 @@ def detect_markers():
                 
                 print_counter=(print_counter+1)%5
 
-        if print_counter==0:
-            cv2.imshow("result", frame)
-            cv2.setWindowProperty("result", cv2.WND_PROP_TOPMOST, 1)
+        # if print_counter==0:
+        #     cv2.imshow("result", frame)
+        #     cv2.setWindowProperty("result", cv2.WND_PROP_TOPMOST, 1)
 
             print(f"Time: {time.time()-start:.4f} сек")
         if cv2.waitKey(1) == ord('q'):
