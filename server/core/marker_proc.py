@@ -51,10 +51,13 @@ except FileNotFoundError:
     exit() # Або завершити програму, якщо калібрування критично важливе
 
 cap = cv2.VideoCapture(0)
+_lock = threading.Lock()
+ARUCO_DICT = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+
 
 def read_img():
-    _lock = threading.Lock()
     ix = 0
+    global _lock
     while True:
         time.sleep(0.1)
         start = time.time()
@@ -76,7 +79,6 @@ def read_img():
 
 
 def prepocess_img():
-    _lock = threading.Lock()
     while True:
         time.sleep(0.1)
         start = time.time()
@@ -107,14 +109,7 @@ def init():
     while len(ids)<3:
         _, frame = cap.read()
 
-
-        # Словник маркерів
-        dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
-
-        # Детекція маркерів
-        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        corners, ids, rejected = aruco.detectMarkers(frame, dictionary)
+        corners, ids, rejected = aruco.detectMarkers(frame, ARUCO_DICT)
         if ids is None or len(ids) == 0:
             # No markers detected
             ids = []
@@ -168,16 +163,70 @@ def init():
 
 
 
+def calculate_angle_and_distance(R_marker, tvec, P_target):
+    """
+    Вычисляет угол поворота и расстояние до целевой точки
+    
+    Исправления:
+    1. Использование копий векторов вместо модификации оригиналов
+    2. Проверка на нулевые векторы перед нормализацией
+    3. Более безопасное вычисление
+    
+    Args:
+        R_marker: матрица поворота маркера (3x3)
+        tvec: позиция маркера [x, y, z]
+        P_target: целевая точка [x, y, z]
+    
+    Returns:
+        theta: угол в радианах
+        distance: расстояние в мм
+        current_direction: нормализованное направление маркера (XZ)
+        target_direction: нормализованное направление к цели (XZ)
+    """
+    
+    # Направление к целевой точке
+    direction_to_target = P_target - tvec
+    direction_to_target_xz = np.array([direction_to_target[0], 0.0, direction_to_target[2]])
+    
+    # Текущее направление маркера (ось Z в системе маркера)
+    marker_forward = R_marker[:, 2]  # Третий столбец - ось Z
+    current_direction_xz = np.array([marker_forward[0], 0.0, marker_forward[2]])
+    
+    # Проверка на нулевые векторы и нормализация
+    norm_current = np.linalg.norm(current_direction_xz)
+    norm_target = np.linalg.norm(direction_to_target_xz)
+    
+    if norm_current < 1e-6 or norm_target < 1e-6:
+        # Вектор слишком мал - невозможно вычислить угол
+        return 0.0, 0.0, np.array([0, 0, 1]), np.array([0, 0, 1])
+    
+    current_direction_xz = current_direction_xz / norm_current
+    direction_to_target_xz = direction_to_target_xz / norm_target
+    
+    # Вычисление угла между направлениями
+    theta = np.arctan2(
+        np.cross(current_direction_xz, direction_to_target_xz)[1],
+        np.dot(current_direction_xz, direction_to_target_xz)
+    )
+    
+    # Расстояние в плоскости XZ
+    dx = P_target[0] - tvec[0]
+    dz = P_target[2] - tvec[2]
+    distance = np.sqrt(dx*dx + dz*dz) * 1000  # мм
+    
+    return theta, distance, current_direction_xz, direction_to_target_xz
+
 
 
 def detect_markers():
     s_state.status="update-pos"
     print_counter = 0
-    # _lock = threading.Lock()
     while True:
         time.sleep(0.1)
         start = time.time()
-        _ , frame = cap.read()
+        ret , frame = cap.read()
+        if not ret:
+            continue
         # if len(pre_proc_frames)==0:
         #     continue
         # _lock.acquire()
@@ -185,13 +234,11 @@ def detect_markers():
         # _lock.release()
 
 
-        # Словник маркерів
-        dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
         # Детекція маркерів
         # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        corners, ids, rejected = aruco.detectMarkers(frame, dictionary)
+        corners, ids, rejected = aruco.detectMarkers(frame, ARUCO_DICT)
 
 
         # Оцінка позиції
@@ -212,31 +259,16 @@ def detect_markers():
                 
 
                 R_marker, _ = cv2.Rodrigues(rvecs[i])
+                
+                if robot.follow_point is None:
+                    continue
+
                 P_target = np.array(robot.follow_point.pos)
 
                 # Направление к целевой точке
-                direction_to_target = P_target - tvec
-                direction_to_target[1] = 0  # Проецируем на горизонтальную плоскость
-                direction_to_target = direction_to_target / np.linalg.norm(direction_to_target)
-
-                # Текущее направление маркера (ось Z в системе маркера)
-                current_direction = R_marker[:, 2]  # Третий столбец - ось Z
-                current_direction[1] = 0  # Проецируем на горизонтальную плоскость
-                current_direction = current_direction / np.linalg.norm(current_direction)
-                # Convert inputs to numpy arrays (минимизируем создание массивов)
-                theta = np.arctan2(
-                    np.cross(current_direction, direction_to_target)[1],
-                    np.dot(current_direction, direction_to_target)
-                )
-                # Угол между направлениями
-
-                if print_counter==0:
-                    print(f"Rmarker: {R_marker}")
-
-                dx = P_target[0] - pos[0]
-                dz = P_target[2] - pos[2]
-                distance = np.sqrt(dx*dx + dz*dz) * 1000  # mm
-
+                theta, distance, current_direction, direction_to_target = \
+                    calculate_angle_and_distance(R_marker, tvec, P_target)
+                
                 robot.pos = pos
                 robot.dir = current_direction
                 robot.target_dir = direction_to_target
@@ -319,8 +351,8 @@ def detect_markers():
         #     cv2.setWindowProperty("result", cv2.WND_PROP_TOPMOST, 1)
 
             print(f"Time: {time.time()-start:.4f} сек")
-        if cv2.waitKey(1) == ord('q'):
-            break
+        # if cv2.waitKey(1) == ord('q'):
+        #     break
 
 
 def run():
