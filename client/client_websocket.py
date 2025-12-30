@@ -234,7 +234,7 @@ async def main():
         # - Updates cs.robot (Robot class from robot_dto.py)
         # - Calls SlaveController methods (from servant_controller.py)
         await robot_client.update_pos()
-        await asyncio.sleep(0.1)  # 10 Hz update rate
+        await asyncio.sleep(0.2)  # 10 Hz update rate
     
     # Stop motors when done (calls SlaveController methods)
     robot_client.controller.set_target_velocity(0.0, 0.0)

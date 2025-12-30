@@ -2,7 +2,7 @@ import time
 from typing import Optional
 
 import core.kinematic as rk
-from core.mock_motor_driver import MotorDriver
+from core.motor_driver import MotorDriver
 from core.pid_controller import PID
 
 
@@ -15,7 +15,7 @@ class SlaveController:
     - If measured wheel speeds are provided to `update()` it runs PID correction.
     """
 
-    def __init__(self, kp=0.6, ki=0.1, kd=0.01, v_max: Optional[float] = None):
+    def __init__(self, kp=1.6, ki=0.1, kd=0.01, v_max: Optional[float] = None):
         self.rd = MotorDriver(v_max)
         self.v_max = v_max if v_max is not None else rk.speeds[-1]
         # per-wheel PIDs
@@ -80,11 +80,11 @@ class SlaveController:
         if out_l > self.max_duty:
             out_l = self.max_duty
         if out_l < -self.max_duty:
-            out_l = -self.max_duty
+            out_l = 0
         if out_r > self.max_duty:
             out_r = self.max_duty
         if out_r < -self.max_duty:
-            out_r = -self.max_duty
+            out_r = 0
 
         self.rd.set_wheel_duty(out_l, out_r)
         return out_l, out_r
