@@ -112,8 +112,8 @@ class RobotClient:
 
         
         # --- УПРАВЛЕНИЕ ---
-        LINEAR_GAIN = 2.0
-        ANGULAR_GAIN = 2.0
+        LINEAR_GAIN = 1.0
+        ANGULAR_GAIN = 1.0
         TURN_THRESHOLD = 0.5  # ~30 градусов
         
         # Угловая скорость

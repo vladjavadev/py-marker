@@ -19,12 +19,13 @@ class SlaveController:
         self.rd = MotorDriver(v_max)
         self.v_max = v_max if v_max is not None else rk.speeds[-1]
         # per-wheel PIDs
-        self.pid_l = PID(kp, ki, kd, out_min=-100.0, out_max=100.0)
-        self.pid_r = PID(kp, ki, kd, out_min=-100.0, out_max=100.0)
+        self.pid_l = PID(kp, ki, kd, out_min=0, out_max=100.0)
+        self.pid_r = PID(kp, ki, kd, out_min=0, out_max=100.0)
         self.target_vl = 0.0
         self.target_vr = 0.0
         self._last_time = None
         self.max_duty = 80.0
+        self.min_duty = 0.0
 
     def set_target_velocity(self, linear_v: float, angular_omega: float):
         """Set desired chassis linear velocity (mm/s) and angular velocity (rad/s)."""
@@ -40,7 +41,7 @@ class SlaveController:
         pct = (abs(v) / self.v_max) * self.max_duty
         if pct > self.max_duty:
             pct = self.max_duty
-        return pct if v >= 0 else -pct
+        return pct if v >= 0 else 0
 
     def update(self, measured_vl: Optional[float] = None, measured_vr: Optional[float] = None):
         """Compute and apply wheel duties.
@@ -92,7 +93,7 @@ class SlaveController:
 
 if __name__ == "__main__":
     # simple demonstration: drive forward for 2 seconds using feedforward only
-    sc = SlaveController(v_max=200)
+    sc = SlaveController(v_max=rk.speeds[2])
     # set 1/2 of max forward speed
     linear = sc.v_max * 0.5
     omega = 0.0
