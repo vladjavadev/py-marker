@@ -24,6 +24,7 @@ class SlaveController:
         self.target_vl = 0.0
         self.target_vr = 0.0
         self._last_time = None
+        self.max_duty = 80.0
 
     def set_target_velocity(self, linear_v: float, angular_omega: float):
         """Set desired chassis linear velocity (mm/s) and angular velocity (rad/s)."""
@@ -36,9 +37,9 @@ class SlaveController:
         # feedforward mapping: scale by v_max to get percentage
         if self.v_max == 0:
             return 0.0
-        pct = (abs(v) / self.v_max) * 100.0
-        if pct > 100.0:
-            pct = 100.0
+        pct = (abs(v) / self.v_max) * self.max_duty
+        if pct > self.max_duty:
+            pct = self.max_duty
         return pct if v >= 0 else -pct
 
     def update(self, measured_vl: Optional[float] = None, measured_vr: Optional[float] = None):
@@ -76,14 +77,14 @@ class SlaveController:
         out_r = ff_r + corr_r
 
         # clamp
-        if out_l > 100:
-            out_l = 100.0
-        if out_l < -100:
-            out_l = -100.0
-        if out_r > 100:
-            out_r = 100.0
-        if out_r < -100:
-            out_r = -100.0
+        if out_l > self.max_duty:
+            out_l = self.max_duty
+        if out_l < -self.max_duty:
+            out_l = -self.max_duty
+        if out_r > self.max_duty:
+            out_r = self.max_duty
+        if out_r < -self.max_duty:
+            out_r = -self.max_duty
 
         self.rd.set_wheel_duty(out_l, out_r)
         return out_l, out_r
