@@ -1,9 +1,9 @@
 import time
 from typing import Optional
 
-import core.kinematic as rk
-from core.motor_driver import MotorDriver
-from core.pid_controller import PID
+import client.core.kinematic as rk
+from client.core.mock_motor_driver import MotorDriver
+from client.core.pid_controller import PID
 
 
 class SlaveController:
@@ -15,35 +15,25 @@ class SlaveController:
     - If measured wheel speeds are provided to `update()` it runs PID correction.
     """
 
-    def __init__(self, kp=1.6, ki=0.1, kd=0.01, v_max: Optional[float] = None):
-        self.rd = MotorDriver(v_max)
-        self.v_max = v_max if v_max is not None else rk.speeds[-1]
+    def __init__(self, kp=1.1, ki=0.1, kd=0.6, vMode=3):
+        self.v_max = rk.speeds[3]
+        self.max_duty = rk.duty_list[3] 
+        self.rd = MotorDriver(self.max_duty)
         # per-wheel PIDs
-        self.pid_l = PID(kp, ki, kd, out_min=0, out_max=100.0)
-        self.pid_r = PID(kp, ki, kd, out_min=0, out_max=100.0)
-        self.target_vl = 0.0
-        self.target_vr = 0.0
+        self.motor_pid = PID(kp, ki, kd, out_min=-50, out_max=50.0)
+        self.base_duty = 30 
+        self.delta_error = 0.0
         self._last_time = None
-        self.max_duty = 80.0
-        self.min_duty = 0.0
 
-    def set_target_velocity(self, linear_v: float, angular_omega: float):
-        """Set desired chassis linear velocity (mm/s) and angular velocity (rad/s)."""
-        L = rk.LwheelBase
-        # differential drive inverse kinematics
-        self.target_vl = linear_v - angular_omega * (L / 2.0)
-        self.target_vr = linear_v + angular_omega * (L / 2.0)
+    def set_target_duty(self, duty_l: float, duty_r: float ):
+        self.rd.set_wheel_duty(duty_l, duty_r)
+        
 
-    def _vel_to_duty(self, v: float) -> float:
-        # feedforward mapping: scale by v_max to get percentage
-        if self.v_max == 0:
-            return 0.0
-        pct = (abs(v) / self.v_max) * self.max_duty
-        if pct > self.max_duty:
-            pct = self.max_duty
-        return pct if v >= 0 else 0
 
-    def update(self, measured_vl: Optional[float] = None, measured_vr: Optional[float] = None):
+    def set_delta_error(self, delta_error: float):
+        self.delta_error = delta_error
+
+    def update(self):
         """Compute and apply wheel duties.
 
         If measured wheel speeds (mm/s) are provided, PID will be applied
@@ -57,25 +47,12 @@ class SlaveController:
             dt = now - self._last_time
         self._last_time = now
 
-        # feedforward duties
-        ff_l = self._vel_to_duty(self.target_vl)
-        ff_r = self._vel_to_duty(self.target_vr)
+        correction = self.motor_pid.update(self.delta_error, dt)
 
-        if measured_vl is None or measured_vr is None:
-            # no feedback available, use feedforward mapping
-            self.rd.set_wheel_duty(ff_l, ff_r)
-            return ff_l, ff_r
-
-        # compute PID corrections (target - measured)
-        err_l = self.target_vl - measured_vl
-        err_r = self.target_vr - measured_vr
-
-        corr_l = self.pid_l.update(err_l, dt)
-        corr_r = self.pid_r.update(err_r, dt)
 
         # combine feedforward percent and PID correction (both are in percent units)
-        out_l = ff_l + corr_l
-        out_r = ff_r + corr_r
+        out_l = self.base_duty + correction
+        out_r = self.base_duty - correction
 
         # clamp
         if out_l > self.max_duty:
@@ -87,13 +64,16 @@ class SlaveController:
         if out_r < -self.max_duty:
             out_r = 0
 
+        self.duty_l = out_l
+        self.duty_r = out_r
+
         self.rd.set_wheel_duty(out_l, out_r)
         return out_l, out_r
 
 
 if __name__ == "__main__":
     # simple demonstration: drive forward for 2 seconds using feedforward only
-    sc = SlaveController(v_max=rk.speeds[2])
+    sc = SlaveController(3)
     # set 1/2 of max forward speed
     linear = sc.v_max * 0.5
     omega = 0.0

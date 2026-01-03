@@ -3,30 +3,28 @@
 import asyncio
 import websockets
 import json
-from data.robot_dto import Robot
-from data.marker import Marker
+from client.data.robot_dto import Robot
+from client.data.marker import Marker
 import time
-import data.client_state as cs
-from core.servant_controller import SlaveController
+import client.data.client_state as cs
+from client.core.servant_controller import SlaveController
 import math
-import core.kinematic as rk
+import client.core.kinematic as rk
 import numpy as np
-
-# Import kinematic functions from robot.kinematic module
 
 
 # WebSocket URI
-uri = "ws://192.168.0.80:8765"
+# uri = "ws://192.168.0.80:8765"
 # uri = "ws://192.168.239.178:8765"
-# uri = "ws://localhost:8765"
+uri = "ws://localhost:8765"
 
 last_theta =0
 
 class RobotClient:
     """Integrated robot client with WebSocket communication and motor control."""
     
-    def __init__(self, v_max: float = 200):
-        self.controller = SlaveController(v_max=v_max)
+    def __init__(self):
+        self.controller = SlaveController(kp=0.08, ki=0.0001, kd=1.2, vMode=3)
         self.marker_id = None
         self.target_position = None
         self.target_angle = None
@@ -58,20 +56,21 @@ class RobotClient:
                     if msg["type"] == "update-pos":
                         if "robot" in msg:
                             robot_state = msg["robot"]
-                            pos = robot_state["pos"]
+                            pos_world = robot_state["pos_world"]
+                            pos_px = robot_state["pos_px"]
                             dir =  robot_state["dir"]
                             target_dir = robot_state["target_dir"]
-                            fp = robot_state.get("follow_point")
+                            target_pos_px = robot_state.get("target_pos_px")
+                            fp = robot_state.get("follow_point_world")
                             
                             # Update robot state
-                            cs.robot.update_pos(pos, dir,target_dir)
+                            cs.robot.update_pos(pos_px, pos_world, dir,target_dir, target_pos_px)
                             if fp:
                                 cs.robot.update_fp(fp)
                             
                             # Calculate and apply motor control
-                            await self._calculate_and_apply_control(pos, dir,target_dir, fp)
-                            
-                            # print(f"New pos: {pos}, angle: {angle}")
+                            await self._calculate_and_apply_control(cs.robot)
+
                             
                 except asyncio.TimeoutError:
                     print("Server not respond")
@@ -82,57 +81,56 @@ class RobotClient:
             print("Error: {}".format(e))
     
 
-    async def _calculate_and_apply_control(self, pos, dir, target_dir, follow_point):
+    async def _calculate_and_apply_control(self, robot: Robot):
         """Calculate motor velocities based on position and target using rotation vectors."""
-        if follow_point is None:
+        if robot.follow_point_world is None:
             self.controller.set_target_velocity(0.0, 0.0)
             self.controller.update()
             return
         
         # Convert inputs to numpy arrays (минимизируем создание массивов)
         theta = np.arctan2(
-            np.cross(dir, target_dir)[1],
-            np.dot(dir, target_dir)
+            np.cross(robot.dir, robot.target_dir)[1],
+            np.dot(robot.dir, robot.target_dir)
         )
 
-        # Вектор к цели в горизонтальной плоскости
-        dx = follow_point[0] - pos[0]
-        dz = follow_point[2] - pos[2]
+        # Vector in horizontal plane from robot to follow point
+        dx = robot.follow_point_world[0] - robot.pos_world[0]
+        dz = robot.follow_point_world[2] - robot.pos_world[2]
         distance = np.sqrt(dx*dx + dz*dz) * 1000  # mm
+
+
+        errorX = robot.pos_px[0] - robot.target_pos_px[0]
         
-        # Проверка близости к цели
-        if distance < 50.0:  # STOP_THRESHOLD_MM
-            self.controller.set_target_velocity(0.0, 0.0)
+        # Check for stopping condition
+        if distance < 50.0:  # STOP_THRESHOLD_MMs
+            self.controller.set_target_duty(0.0, 0.0)
             self.controller.update()
             return
         
+        # Adjust base duty based on distance
+        self.controller.base_duty = 30
+        if distance > 500.0:
+            self.controller.base_duty = 60
         
         if theta < 1e-6:
             current_angle = 0.0
 
+
+        TURN_THRESHOLD = 0.8  # radians, approx 45 degrees
         
-        # --- УПРАВЛЕНИЕ ---
-        LINEAR_GAIN = 1.0
-        ANGULAR_GAIN = 1.0
-        TURN_THRESHOLD = 0.5  # ~30 градусов
-        
-        # Угловая скорость
-        angular_omega = 0-theta * ANGULAR_GAIN
-        
-        # Линейная скорость с ограничением
-        linear_v = min(distance * LINEAR_GAIN, self.controller.v_max)
-        
-        # Замедление при резких поворотах
+        # Slow down for sharp turns
         if abs(theta) > TURN_THRESHOLD:
-            linear_v *= 0.5
-        
-        # Применение управления
-        self.controller.set_target_velocity(float(linear_v), float(angular_omega))
+            errorX *=0.8
+            print("Sharp turn detected, reducing speed")
+
+
+        self.controller.set_delta_error(errorX)
         self.controller.update()
         
-        # Упрощенный вывод (print может быть узким местом)
-        if distance > 100:  # Печатаем только если далеко от цели
-            print("v={:.0f} ω={:.2f} d={:.0f}mm".format(linear_v, angular_omega, distance))
+        # debug output
+        if distance > 100:  
+            print("duty_l={:.0f} duty_r={:.0f} d={:.0f}mm".format(self.controller.duty_l,self.controller.duty_r, distance))
 
     @staticmethod
     def _normalize_angle(angle):
@@ -187,7 +185,7 @@ class RobotClient:
                             robot_state = msg["robot"]
                             marker_id = robot_state["marker_id"]
                             cs.robot = Robot(Marker(marker_id))
-                            print("Робот инициализирован с marker_id={marker_id}".format(marker_id=marker_id))
+                            print("Robot initialized withmarker_id={marker_id}".format(marker_id=marker_id))
                             
                 except asyncio.TimeoutError:
                     print("Server not respond")
@@ -198,12 +196,12 @@ class RobotClient:
             print("Error : {}".format(e))
 
 
-async def main():
+async def run_client():
     """Main control loop - calls functions from other modules."""
     print("=== Start client robot ===")
     
     # Initialize robot client with max velocity from kinematic module
-    robot_client = RobotClient(v_max=rk.speeds[3])
+    robot_client = RobotClient()
     while cs.status=="start-client":
         await robot_client.get_status()
         await asyncio.sleep(4.0)
@@ -242,10 +240,3 @@ async def main():
     print("Move end")
 
 
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\n\n Program interrupted by user")
-    except Exception as e:
-        print("\n\nCritical error: {}".format(e))

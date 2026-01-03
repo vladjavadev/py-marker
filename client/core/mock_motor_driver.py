@@ -19,12 +19,9 @@ class MotorDriver:
     # Eingänge In2 und In2 invertiert zueinander (geben Drehrichtung vor)
 
     FREQ = 250000
-    pwm_max = 90
-    pwm_min = 30
 
-    def __init__(self, v_max):
+    def __init__(self, max_duty):
         """Initialize mock motor driver"""
-        self.v_max = v_max  # Store v_max properly
         self.pwm_l = 0
         self.pwm_r = 0
         self._state = {
@@ -33,6 +30,7 @@ class MotorDriver:
             self.pin_BmotL: 0,
             self.pin_BmotR: 0,
         }
+        self.pwm_max = max_duty
 
     def set_wheel_duty(self, ff_l, ff_r):
         """Set wheel duty cycle (mock version)
@@ -42,19 +40,9 @@ class MotorDriver:
             ff_r: Right wheel duty cycle (-100 to 100)
         """
         # Clamp input values to valid range
-        ff_l = max(-100, min(100, ff_l))
-        ff_r = max(-100, min(100, ff_r))
-        
-        # Calculate PWM values (map from 0-100% to pwm_min-pwm_max range)
-        if abs(ff_l) > 0:
-            self.pwm_l = int(self.pwm_min + (abs(ff_l) / 100.0) * (self.pwm_max - self.pwm_min))
-        else:
-            self.pwm_l = 0
-            
-        if abs(ff_r) > 0:
-            self.pwm_r = int(self.pwm_min + (abs(ff_r) / 100.0) * (self.pwm_max - self.pwm_min))
-        else:
-            self.pwm_r = 0
+        ff_l = max(-self.pwm_max, min(self.pwm_max, ff_l))
+        ff_r = max(-self.pwm_max, min(self.pwm_max, ff_r))
+
 
         # Reset all pins
         for pin in self._state:

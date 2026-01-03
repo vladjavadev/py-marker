@@ -25,10 +25,9 @@ class MotorDriver:
     pin_BIN2 = "P9_23"  # Motor B input 2
 
     FREQ = 25000  # 25kHz PWM frequency (typical for TB6612FNG)
-    pwm_max = 90
-    pwm_min = 30
 
-    def __init__(self, v_max):
+
+    def __init__(self, max_duty):
         """Initialize motor driver with hardware PWM
         
         Args:
@@ -50,9 +49,9 @@ class MotorDriver:
         PWM.start(self.pin_PWMA, 0, self.FREQ, 0)
         PWM.start(self.pin_PWMB, 0, self.FREQ, 0)
         
-        self.v_max = v_max
         self.pwm_l = 0
         self.pwm_r = 0
+        self.pwm_max = max_duty
 
     def set_wheel_duty(self, duty_l, duty_r):
         """Set wheel duty cycle from PID controller output
@@ -62,19 +61,9 @@ class MotorDriver:
             duty_r: Right wheel duty cycle (-100 to 100)
         """
         # Clamp input values to valid range
-        duty_l = max(-100, min(100, duty_l))
-        duty_r = max(-100, min(100, duty_r))
-        
-        # Calculate PWM values (map from 0-100% to pwm_min-pwm_max range)
-        if abs(duty_l) > 0:
-            self.pwm_l = int(self.pwm_min + (abs(duty_l) / 100.0) * (self.pwm_max - self.pwm_min))
-        else:
-            self.pwm_l = 0
-            
-        if abs(duty_r) > 0:
-            self.pwm_r = int(self.pwm_min + (abs(duty_r) / 100.0) * (self.pwm_max - self.pwm_min))
-        else:
-            self.pwm_r = 0
+        duty_l = max(-self.pwm_max, min(self.pwm_max, duty_l))
+        duty_r = max(-self.pwm_max, min(self.pwm_max, duty_r))
+
 
         # Left motor (Motor A) control
         # Direction: AIN1=HIGH, AIN2=LOW -> Forward
@@ -109,24 +98,6 @@ class MotorDriver:
             GPIO.output(self.pin_BIN1, GPIO.LOW)
             GPIO.output(self.pin_BIN2, GPIO.LOW)
             PWM.set_duty_cycle(self.pin_PWMB, 0)
-
-    def set_motor_speed(self, vl, vr):
-        """Set motor speed in mm/s (legacy method for compatibility)
-        
-        Args:
-            vl: Left wheel velocity in mm/s
-            vr: Right wheel velocity in mm/s
-        """
-        # Convert velocity to duty cycle percentage
-        if self.v_max == 0:
-            duty_l = 0
-            duty_r = 0
-        else:
-            duty_l = (vl / self.v_max) * 100.0
-            duty_r = (vr / self.v_max) * 100.0
-        
-        # Use the main control method
-        self.set_wheel_duty(duty_l, duty_r)
 
     def stop(self):
         """Emergency stop - set all motors to brake mode"""
