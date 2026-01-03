@@ -7,7 +7,7 @@ rps = [0.7,0.93,0.99,1.03,1.06]
 wheelRadius = 30 #mm
 speeds =[2*3.14*wheelRadius*i for i in rps ]
 LwheelBase = 150 #mm
-# kdc = 0.8
+
 
 def get_omega(vl, vr):
     return (vr - vl)/LwheelBase

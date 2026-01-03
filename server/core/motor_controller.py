@@ -1,4 +1,4 @@
-from core.motor_driver import MotorDriver
+from server.core.motor_driver import MotorDriver
 from typing import List
 import time
 

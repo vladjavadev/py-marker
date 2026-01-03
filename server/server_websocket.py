@@ -7,8 +7,8 @@ from websockets.asyncio.server import serve, ServerConnection
 import json
 import threading
 import functools
-import core.marker_proc as m
-import data.server_state as s_state
+import server.core.marker_proc as m
+import server.data.server_state as s_state
 
 
 
@@ -40,7 +40,7 @@ def send_stop_robot(robot_dto):
     if robot_dto.marker.id in s_state.connected_clients:
         asyncio.run_coroutine_threadsafe(
             _send_stop_robot_msg(robot_dto), 
-            s_state.loop  # You need to store the main loop reference
+            s_state.loop
         )
 
 
@@ -81,10 +81,12 @@ async def echo(websocket:ServerConnection):
                     "type": "update-pos",
                     "robot": {
                         "marker_id":int(updated_robot.marker.id),
-                        "pos":updated_robot.pos.tolist(),
-                        "follow_point":updated_robot.follow_point.pos,
-                        "dir":updated_robot.dir.tolist(),
-                        "target_dir":updated_robot.target_dir.tolist(),
+                        "pos_px":updated_robot.pos_px,
+                        "pos_world":updated_robot.pos_world,
+                        "follow_point_world":updated_robot.follow_point_world.pos,
+                        "target_pos_px":updated_robot.target_pos_px,
+                        "dir":updated_robot.dir,
+                        "target_dir":updated_robot.target_dir,
                         }
                     }
 
