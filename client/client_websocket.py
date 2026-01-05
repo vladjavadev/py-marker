@@ -24,7 +24,7 @@ class RobotClient:
     """Integrated robot client with WebSocket communication and motor control."""
     
     def __init__(self):
-        self.controller = SlaveController(kp=0.08, ki=0.0001, kd=1.2, vMode=3)
+        self.controller = SlaveController(kp=0.2, ki=0.0001, kd=1.2, vMode=3)
         self.marker_id = None
         self.target_position = None
         self.target_angle = None
@@ -108,8 +108,8 @@ class RobotClient:
             return
         
         # Adjust base duty based on distance
-        self.controller.base_duty = 30
-        if distance > 500.0:
+        self.controller.base_duty = 40
+        if distance > 300.0:
             self.controller.base_duty = 60
         
         if theta < 1e-6:
