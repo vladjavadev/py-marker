@@ -63,6 +63,8 @@ class MotorDriver:
         # Clamp input values to valid range
         duty_l = max(-self.pwm_max, min(self.pwm_max, duty_l))
         duty_r = max(-self.pwm_max, min(self.pwm_max, duty_r))
+        self.pwm_l = abs(duty_l)
+        self.pwm_r = abs(duty_r)
 
 
         # Left motor (Motor A) control
