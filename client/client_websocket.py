@@ -14,9 +14,9 @@ import numpy as np
 
 
 # WebSocket URI
-# uri = "ws://192.168.0.80:8765"
+uri = "ws://192.168.0.101:8765"
 # uri = "ws://192.168.239.178:8765"
-uri = "ws://localhost:8765"
+# uri = "ws://localhost:8765"
 
 last_theta =0
 
@@ -103,9 +103,8 @@ class RobotClient:
         errorX = robot.pos_px[0] - robot.target_pos_px[0]
         
         # Check for stopping condition
-        if distance < 50.0:  # STOP_THRESHOLD_MMs
+        if distance < 100.0:  # STOP_THRESHOLD_MMs
             self.controller.set_target_duty(0.0, 0.0)
-            self.controller.update()
             return
         
         # Adjust base duty based on distance
