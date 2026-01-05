@@ -73,10 +73,10 @@ class MotorDriver:
             GPIO.output(self.pin_AIN1, GPIO.HIGH)
             GPIO.output(self.pin_AIN2, GPIO.LOW)
             PWM.set_duty_cycle(self.pin_PWMA, self.pwm_l)
-        elif duty_l < 0:  # Reverse
-            GPIO.output(self.pin_AIN1, GPIO.LOW)
-            GPIO.output(self.pin_AIN2, GPIO.HIGH)
-            PWM.set_duty_cycle(self.pin_PWMA, self.pwm_l)
+        # elif duty_l < 0:  # Reverse
+        #     GPIO.output(self.pin_AIN1, GPIO.LOW)
+        #     GPIO.output(self.pin_AIN2, GPIO.HIGH)
+        #     PWM.set_duty_cycle(self.pin_PWMA, self.pwm_l)
         else:  # Stop
             GPIO.output(self.pin_AIN1, GPIO.LOW)
             GPIO.output(self.pin_AIN2, GPIO.LOW)
@@ -90,10 +90,10 @@ class MotorDriver:
             GPIO.output(self.pin_BIN1, GPIO.HIGH)
             GPIO.output(self.pin_BIN2, GPIO.LOW)
             PWM.set_duty_cycle(self.pin_PWMB, self.pwm_r)
-        elif duty_r < 0:  # Reverse
-            GPIO.output(self.pin_BIN1, GPIO.LOW)
-            GPIO.output(self.pin_BIN2, GPIO.HIGH)
-            PWM.set_duty_cycle(self.pin_PWMB, self.pwm_r)
+        # elif duty_r < 0:  # Reverse
+        #     GPIO.output(self.pin_BIN1, GPIO.LOW)
+        #     GPIO.output(self.pin_BIN2, GPIO.HIGH)
+        #     PWM.set_duty_cycle(self.pin_PWMB, self.pwm_r)
         else:  # Stop
             GPIO.output(self.pin_BIN1, GPIO.LOW)
             GPIO.output(self.pin_BIN2, GPIO.LOW)

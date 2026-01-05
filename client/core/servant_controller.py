@@ -57,11 +57,11 @@ class SlaveController:
         # clamp
         if out_l > self.max_duty:
             out_l = self.max_duty
-        if out_l < -self.max_duty:
+        if out_l < 0:
             out_l = 0
         if out_r > self.max_duty:
             out_r = self.max_duty
-        if out_r < -self.max_duty:
+        if out_r < 0:
             out_r = 0
 
         self.duty_l = out_l
