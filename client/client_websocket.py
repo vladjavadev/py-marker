@@ -24,7 +24,7 @@ class RobotClient:
     """Integrated robot client with WebSocket communication and motor control."""
     
     def __init__(self):
-        self.controller = SlaveController(kp=0.2, ki=0.0001, kd=1.2, vMode=3)
+        self.controller = SlaveController(kp=0.25, ki=0.0001, kd=0.7, vMode=3)
         self.marker_id = None
         self.target_position = None
         self.target_angle = None
