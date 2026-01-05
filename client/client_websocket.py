@@ -24,7 +24,7 @@ class RobotClient:
     """Integrated robot client with WebSocket communication and motor control."""
     
     def __init__(self):
-        self.controller = SlaveController(kp=0.25, ki=0.0001, kd=0.7, vMode=3)
+        self.controller = SlaveController(kp=0.1, ki=0.0001, kd=0.15, vMode=3)
         self.marker_id = None
         self.target_position = None
         self.target_angle = None
@@ -103,7 +103,7 @@ class RobotClient:
         errorX = robot.pos_px[0] - robot.target_pos_px[0]
         
         # Check for stopping condition
-        if distance < 100.0:  # STOP_THRESHOLD_MMs
+        if distance < 80.0:  # STOP_THRESHOLD_MMs
             self.controller.set_target_duty(0.0, 0.0)
             return
         
