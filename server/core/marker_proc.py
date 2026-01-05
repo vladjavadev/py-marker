@@ -121,8 +121,8 @@ def init():
 
     s_state.camera_is_on = True
 
-    #wait until at least 3 markers detected
-    while len(ids)<3:
+    #wait until at least 2 markers detected
+    while len(ids)<2:
         _, frame = cap.read()
 
         corners, ids, rejected = aruco.detectMarkers(frame, ARUCO_DICT)
@@ -131,11 +131,10 @@ def init():
             ids = []
 
         time.sleep(0.1)
-        
-        cv2.imshow("result", frame)
-        print(f"Time: {time.time()-start:.4f} сек")
-        cv2.waitKey(1)
-    cv2.destroyWindow("result")
+        print(f"wait show marker Time: {time.time()-start:.4f} sec")
+    #     cv2.imshow("result", frame)
+    #     cv2.waitKey(1)
+    # cv2.destroyWindow("result")
 
 
 
@@ -235,11 +234,13 @@ def calculate_angle_and_distance(R_marker, tvec, P_target):
     
     return theta, distance, current_direction_xz, direction_to_target_xz
 
-
+robot_json_data = []
 
 def detect_markers():
+    global robot_json_data
     s_state.status="update-pos"
     print_counter = 0
+    json_append_counter = 0
     #run detection loop
     while True:
         time.sleep(0.1)
@@ -254,6 +255,7 @@ def detect_markers():
         # estimate pose of each marker and return the values rvec and tvec---different from camera coefficients
         if ids is not None:
             rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(corners, 0.05, camera_matrix, dist_coeffs)
+            robot_record = []
             for i in range(len(ids)):
                 marker_id = int(ids[i][0])
                 if ids[i][0] not in  robot_dto_dict:
@@ -292,98 +294,21 @@ def detect_markers():
                 robot.pos_px = current_robot_pos_px
                 robot.dir = current_direction.tolist()
                 robot.target_dir = direction_to_target.tolist()
+                robot_record.append(robot.to_json())
                 
-                #output visualization
-                target_img_point, _ = cv2.projectPoints(
-                    P_target.reshape(1, 3), 
-                    np.zeros((3,1)), 
-                    np.zeros((3,1)), 
-                    camera_matrix, 
-                    dist_coeffs
-                )
                 
-                cv2.circle(frame, 
-                        tuple(target_img_point[0][0].astype(int)), 
-                        10, (255, 255, 0), -1)  # Голубая точка
-                cv2.putText(frame, "FOLLOW TARGET", 
-                        tuple(target_img_point[0][0].astype(int) + np.array([15, -10])),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
-                
-                # Визуализация P_target (точка для ориентации - фиолетовая)
-                p_target_img, _ = cv2.projectPoints(
-                    P_target.reshape(1, 3), 
-                    np.zeros((3,1)), 
-                    np.zeros((3,1)), 
-                    camera_matrix, 
-                    dist_coeffs
-                )
-                
-                cv2.circle(frame, 
-                        tuple(p_target_img[0][0].astype(int)), 
-                        8, (255, 0, 255), -1)  # Фиолетовая точка
-                cv2.putText(frame, "ORIENT TARGET", 
-                        tuple(p_target_img[0][0].astype(int) + np.array([15, 10])),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
-                
+            print_counter=(print_counter+1)%30
+            json_append_counter=(json_append_counter+1)%10
 
-                cv2.putText(
-                    frame,
-                    f"dist: {distance:.2f}",   # обрезаем до 2 знаков после запятой
-                    tuple(p_target_img[0][0].astype(int) + np.array([15, 100])),     # позиция текста: слева внизу
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 0, 255),
-                    2
-                )
-
-                cv2.putText(
-                    frame,
-                    f"error_x: {error_x:.2f}",   # обрезаем до 2 знаков после запятой
-                    tuple(p_target_img[0][0].astype(int) + np.array([15, -50])),     # позиция текста: слева внизу
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 0, 255),
-                    2
-                )
-
-
-                cv2.putText(
-                    frame,
-                    f"Rdelta: {theta:.2f}",   # обрезаем до 2 знаков после запятой
-                    tuple(p_target_img[0][0].astype(int) + np.array([15, -20])),     # позиция текста: слева внизу
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 0, 255),
-                    2
-                )
-
-                # Стрелка от ведомого к целевой позиции следования
-                follower_img, _ = cv2.projectPoints(
-                    tvecs[i][0].reshape(1, 3), 
-                    np.zeros((3,1)), 
-                    np.zeros((3,1)), 
-                    camera_matrix, 
-                    dist_coeffs
-                )
-                cv2.arrowedLine(frame, 
-                            tuple(follower_img[0][0].astype(int)),
-                            tuple(target_img_point[0][0].astype(int)),
-                            (0, 255, 255), 2, tipLength=0.3)
-                
-                # Информация на изображении
-                cv2.putText(frame, f"ID: {ids[i][0]}", 
-                        tuple(follower_img[0][0].astype(int) + np.array([-50, -15])),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-                
-                print_counter=(print_counter+1)%5
+            if json_append_counter==0:
+                robot_json_data.append(robot_record)
 
         if print_counter==0:
-            cv2.imshow("result", frame)
-            cv2.setWindowProperty("result", cv2.WND_PROP_TOPMOST, 1)
-
-            print(f"Time: {time.time()-start:.4f} сек")
-        if cv2.waitKey(1) == ord('q'):
-            break
+            print(f"send and calc time: {time.time()-start:.4f} sec")
+            print("----robot records: ----")
+            for i in robot_json_data:
+                print("record: ",i)
+            robot_json_data.clear()
 
 
 def run():
