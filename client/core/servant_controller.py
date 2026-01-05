@@ -46,9 +46,10 @@ class SlaveController:
         else:
             dt = now - self._last_time
         self._last_time = now
-
         correction = self.motor_pid.update(self.delta_error, dt)
 
+        if (abs(self.delta_error)-10 < 0):
+            correction = 0.0
 
         # combine feedforward percent and PID correction (both are in percent units)
         out_l = self.base_duty + correction

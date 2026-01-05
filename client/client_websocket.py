@@ -14,7 +14,7 @@ import numpy as np
 
 
 # WebSocket URI
-uri = "ws://192.168.0.101:8765"
+uri = "ws://192.168.0.80:8765"
 # uri = "ws://192.168.239.178:8765"
 # uri = "ws://localhost:8765"
 
