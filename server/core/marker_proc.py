@@ -13,8 +13,6 @@ from typing import List
 
 
 COUNT_FP = 2
-pre_proc_frames = deque(maxlen=3)
-post_proc_frames = deque(maxlen=3)
 robot_dto_dict: dict[int, Robot] = {}
 
 fp_tpos_dict = {}
@@ -46,49 +44,19 @@ except FileNotFoundError:
     exit() # Або завершити програму, якщо калібрування критично важливе
 
 cap = cv2.VideoCapture(0)
-_lock = threading.Lock()
 ARUCO_DICT = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
 
 def read_img():
-    ix = 0
-    global _lock
-    while True:
-        time.sleep(0.1)
-        start = time.time()
-        if len(pre_proc_frames)==pre_proc_frames.maxlen:
-            _lock.acquire()
-            last = pre_proc_frames.pop()
-            pre_proc_frames.clear()
-            pre_proc_frames.append(last)
-            _lock.release()
-        else:
-            _,frame = cap.read()
-            _lock.acquire()
-
-            pre_proc_frames.append(frame)
-            _lock.release()
-            # print("reading time: ", time.time()-start)
-        ix=(ix+1)%3
+    global cap
+    ret,frame = cap.read()
+    return ret, frame
         
 
 
-def prepocess_img():
-    while True:
-        time.sleep(0.1)
-        start = time.time()
-        if len(post_proc_frames)==post_proc_frames.maxlen:
-            last = post_proc_frames.pop()
-            post_proc_frames.clear()
-            post_proc_frames.append(last)
-
-        if len(pre_proc_frames)>0:
-            frame = pre_proc_frames.pop()
-            # frame = cv2.resize(frame, (320, 240))
-            # frame = frame[0:120, :]
-            post_proc_frames.append(frame)
-       
-            print("preproc time: ", time.time()-start)
+def preprocess_img(img):
+    frame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    return frame
 
 
  
@@ -253,13 +221,20 @@ def detect_markers():
     global robot_json_data
     print_counter = 0
     json_append_counter = 0
+
+    robot_delta_dict = {}
+    robot_dto_dict[2] = []
+    robot_dto_dict[3] = []
     #run detection loop
     while s_state.run_detection:
         time.sleep(0.1)
         start = time.time()
-        ret , frame = cap.read()
+
+        ret, img = read_img()
         if not ret:
             continue
+        frame = preprocess_img(img)
+
 
         corners, ids, rejected = aruco.detectMarkers(frame, ARUCO_DICT)
 
@@ -304,13 +279,15 @@ def detect_markers():
                 theta, distance, current_direction, direction_to_target = \
                     calculate_angle_and_distance(R_marker, tvec, P_target)
                 
+                cur_delta_list = robot_delta_dict[marker_id]
+                cur_delta_list.append(error_x)  
                 # Update robot DTO
                 robot.pos_world = tvec.tolist()
                 robot.pos_px = current_robot_pos_px
                 robot.dir = current_direction.tolist()
                 robot.target_dir = direction_to_target.tolist()
                 robot.detected = True
-                robot_record.append(robot.to_json())
+                robot_record.append(robot)
 
                 
                 
@@ -319,13 +296,14 @@ def detect_markers():
 
             if json_append_counter==0:
                 robot_json_data.append(robot_record)
-
-        if print_counter==0:
-            print(f"send and calc time: {time.time()-start:.4f} sec")
-            print("----robot records: ----")
-            for i in robot_json_data:
-                print("record: ",i)
-            robot_json_data.clear()
+    print("+++robot_data")
+    for i in robot_json_data:
+        print(i)
+    for i in robot_delta_dict:
+        print("+++marker_id :",i)
+        for el in robot_delta_dict[i]:
+            print(el,end=", ")
+    print("")
 
 
 def hold_on_pos():
