@@ -62,8 +62,10 @@ class RobotClient:
                             target_dir = robot_state["target_dir"]
                             target_pos_px = robot_state.get("target_pos_px")
                             fp = robot_state.get("follow_point_world")
-                            
+                            detected = robot_state.get("detected", False)
+                           
                             # Update robot state
+                            cs.robot.detected = detected
                             cs.robot.update_pos(pos_px, pos_world, dir,target_dir, target_pos_px)
                             if fp:
                                 cs.robot.update_fp(fp)
@@ -84,8 +86,11 @@ class RobotClient:
     async def _calculate_and_apply_control(self, robot: Robot):
         """Calculate motor velocities based on position and target using rotation vectors."""
         if robot.follow_point_world is None:
-            self.controller.set_target_velocity(0.0, 0.0)
-            self.controller.update()
+            self.controller.set_target_duty(30.0, 0.0)
+            return
+        
+        if not robot.detected:
+            self.controller.set_target_duty(30.0, 0.0)
             return
         
         # Convert inputs to numpy arrays (минимизируем создание массивов)
@@ -120,7 +125,7 @@ class RobotClient:
         
         # Slow down for sharp turns
         if abs(theta) > TURN_THRESHOLD:
-            errorX *=0.8
+            errorX *=0.4
             print("Sharp turn detected, reducing speed")
 
 

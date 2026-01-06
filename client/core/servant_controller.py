@@ -78,8 +78,8 @@ if __name__ == "__main__":
     # set 1/2 of max forward speed
     linear = sc.v_max * 0.5
     omega = 0.0
-    sc.set_target_velocity(linear, omega)
+    sc.set_target_duty(40.0, 40.0)
     sc.update()  # feedforward
     time.sleep(2.0)
-    sc.set_target_velocity(0.0, 0.0)
+    sc.set_target_duty(0.0, 0.0)
     sc.update()

@@ -12,6 +12,7 @@ class Robot:
 
         self.pos_world=[]
         self.follow_point_world = (0,0,0.2)
+        self.detected = False
 
 
     def update_pos(self, pos_px, pos_world, dir, target_dir, target_pos_px):
