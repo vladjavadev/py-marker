@@ -16,6 +16,7 @@ ip="0.0.0.0"
 
 client_events = {}
 
+
 async def wait_client(id, timeout=5):
     event = client_events.setdefault(id, asyncio.Event())
     try:
@@ -93,8 +94,18 @@ async def echo(websocket:ServerConnection):
 
                 await websocket.send(json.dumps(msg))
 
+    if event["type"] == "ready-move":
+        if "marker_id" in event:
+            msg = {
+                "type":"ready-move",
+                "value":"hold-on-pos"
+            }
+            id = event["marker_id"]
+            s_state.ready_move[id] = "ready-move"
+            await websocket.send(json.dumps(msg))
+
+
    
-    # assert event["type"] == "start"
     if event["type"] == "init-marker":
 
         if "robot" in event:
@@ -106,12 +117,11 @@ async def echo(websocket:ServerConnection):
             }
             marker_id = event["robot"]["marker_id"]
             s_state.connected_clients[marker_id] = websocket
-            s_state.status="initialized"
-            await asyncio.sleep(2.0)
+            if not s_state.is_started:
+                s_state.is_started = True
             if s_state.camera_is_on:
                 await websocket.send(json.dumps(init_marker_msg))
-            else:
-                s_state.status="start-server"
+
 
                 
 

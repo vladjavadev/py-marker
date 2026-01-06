@@ -92,7 +92,16 @@ def prepocess_img():
 
 
  
-    
+def wait_clients():
+    unit = 40
+    start_time = time.time() 
+    wait_time = 0
+
+    while( len(s_state.connected_clients)<2 and wait_time<unit):
+        wait_time = time.time()-start_time
+        time.sleep(0.2)
+
+
 def init():
     ids = []
     global cap
@@ -100,6 +109,8 @@ def init():
         cap.release()
         time.sleep(1.0)
         cap = cv2.VideoCapture(0)
+
+    print("camera is opened!")
 
     #normalize pixel target points to world coordinates    
     _, frame = cap.read()
@@ -121,10 +132,11 @@ def init():
 
     s_state.camera_is_on = True
 
+    s_state.status = "search-markers"
+
     #wait until at least 2 markers detected
     while len(ids)<2:
         _, frame = cap.read()
-
         corners, ids, rejected = aruco.detectMarkers(frame, ARUCO_DICT)
         if ids is None or len(ids) == 0:
             # No markers detected
@@ -132,10 +144,10 @@ def init():
 
         time.sleep(0.1)
         print(f"wait show marker Time: {time.time()-start:.4f} sec")
-    #     cv2.imshow("result", frame)
-    #     cv2.waitKey(1)
-    # cv2.destroyWindow("result")
 
+    print("waiting clients...")
+    s_state.status = "wait-clients"
+    wait_clients()
 
 
     # Оцінка позиції
@@ -236,13 +248,13 @@ def calculate_angle_and_distance(R_marker, tvec, P_target):
 
 robot_json_data = []
 
+
 def detect_markers():
     global robot_json_data
-    s_state.status="update-pos"
     print_counter = 0
     json_append_counter = 0
     #run detection loop
-    while True:
+    while s_state.run_detection:
         time.sleep(0.1)
         start = time.time()
         ret , frame = cap.read()
@@ -250,7 +262,7 @@ def detect_markers():
             continue
 
         corners, ids, rejected = aruco.detectMarkers(frame, ARUCO_DICT)
-        
+
         for i in robot_dto_dict.values():
             i.detected = False
 
@@ -316,8 +328,33 @@ def detect_markers():
             robot_json_data.clear()
 
 
-def run():
-    while s_state.status=="start-server":
+def hold_on_pos():
+    s_state.status = "hold-on-pos"
+    unit = 30
+    start_time = time.time() 
+    wait_time = 0
+    while len(s_state.ready_move)<2 and wait_time<unit :
+        wait_time = time.time() - start_time
         time.sleep(0.5)
+    s_state.run_detection = False
+    
+def wait_send_ready_status():
+    time.sleep(10)
+    s_state.run_detection=True
+
+def run():
+    while s_state.is_started==False:
+        time.sleep(0.5)   
     init()
+
+    threading.Thread(target=hold_on_pos,name="hold_on_pos").start()
     detect_markers()
+
+    s_state.status = "ready-move"
+    threading.Thread(target=wait_send_ready_status,name="wait_send_ready_status").start()
+    while s_state.run_detection == False:
+        time.sleep(0.1)
+    
+    s_state.status="update-pos"
+    detect_markers()   
+     
