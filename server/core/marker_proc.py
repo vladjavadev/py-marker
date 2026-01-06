@@ -223,8 +223,8 @@ def detect_markers():
     json_append_counter = 0
 
     robot_delta_dict = {}
-    robot_dto_dict[2] = []
-    robot_dto_dict[3] = []
+    robot_delta_dict[2] = []
+    robot_delta_dict[3] = []
     #run detection loop
     while s_state.run_detection:
         time.sleep(0.1)
