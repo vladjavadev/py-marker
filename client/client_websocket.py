@@ -14,9 +14,9 @@ import numpy as np
 
 
 # WebSocket URI
-uri = "ws://192.168.0.80:8765"
+# uri = "ws://192.168.0.80:8765"
 # uri = "ws://192.168.239.178:8765"
-# uri = "ws://localhost:8765"
+uri = "ws://localhost:8765"
 
 last_theta =0
 
@@ -28,6 +28,7 @@ class RobotClient:
         self.marker_id = None
         self.target_position = None
         self.target_angle = None
+        self.distance = 200
         
     async def init_marker(self, marker: Marker):
         """Initialize marker on server."""
@@ -103,6 +104,7 @@ class RobotClient:
         dx = robot.follow_point_world[0] - robot.pos_world[0]
         dz = robot.follow_point_world[2] - robot.pos_world[2]
         distance = np.sqrt(dx*dx + dz*dz) * 1000  # mm
+        self.distance = distance
 
 
         errorX = robot.pos_px[0] - robot.target_pos_px[0]
@@ -136,6 +138,31 @@ class RobotClient:
         if distance > 100:  
             print("duty_l={:.0f} duty_r={:.0f} d={:.0f}mm".format(self.controller.duty_l,self.controller.duty_r, distance))
 
+
+    async def _send_req_ready_move(self):
+        """Fetch connection status from server."""
+        try:
+            async with websockets.connect(uri) as websocket:
+                event = {"type": "ready-move",
+                         "marker_id": self.marker_id}
+                
+                await websocket.send(json.dumps(event))
+                print("Event send: {event}".format(event=event))
+                
+                try:
+                    response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
+                    event = json.loads(response)
+                    if event["type"] == "ready-move":
+                        if "value" in event:
+                            cs.status = event["value"]
+                    print("Status: {cs.status}".format(cs=cs))
+                except asyncio.TimeoutError:
+                    print("Server not respond")
+                    
+        except ConnectionRefusedError:
+            print("Connection refused")
+        except Exception as e:
+            print("Error: {}".format(e))
 
     
     async def get_status(self):
@@ -215,19 +242,36 @@ async def run_client():
     print("init...")
     time.sleep(6)
     
-    # Wait for other clients
     await robot_client.get_status()
+    while cs.status == "search-markers":
+        print("search-markers...")
+        await robot_client.get_status()
+        await asyncio.sleep(2)
+
+
     while cs.status == "wait-clients":
         print("wait clients...")
         await robot_client.get_status()
         await asyncio.sleep(2)
     
+    while True:
+        await robot_client.update_pos()
+        if robot_client.distance<100:
+            await robot_client._send_req_ready_move()
+            break
+        await asyncio.sleep(0.1)
+
+
+    while cs.status == "hold-on-pos":
+        await robot_client.get_status()
+        await asyncio.sleep(0.1)
+    
+    while cs.status=="ready-move":
+        await robot_client.get_status() 
+        await asyncio.sleep(0.2)
     
     print("Start movement")
     while True:
-        # Calls update_pos which internally:
-        # - Updates cs.robot (Robot class from robot_dto.py)
-        # - Calls SlaveController methods (from servant_controller.py)
         await robot_client.update_pos()
         await asyncio.sleep(0.2)  # 10 Hz update rate
     

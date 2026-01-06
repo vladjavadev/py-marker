@@ -2,7 +2,7 @@ import time
 from typing import Optional
 
 import client.core.kinematic as rk
-from client.core.motor_driver import MotorDriver
+from client.core.mock_motor_driver import MotorDriver
 from client.core.pid_controller import PID
 
 

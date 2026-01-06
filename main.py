@@ -8,4 +8,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n\n Program interrupted by user")
     except Exception as e:
-        print("\n\nCritical error: {}".format(e))
+        print("\n\nCritical error: {}".format(e))           
