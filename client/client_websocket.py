@@ -24,7 +24,7 @@ class RobotClient:
     """Integrated robot client with WebSocket communication and motor control."""
     
     def __init__(self):
-        self.controller = SlaveController(kp=0.1, ki=0.0001, kd=0.15, vMode=3)
+        self.controller = SlaveController(kp=1.2, ki=0.0, kd=0.6, vMode=3)
         self.marker_id = None
         self.target_position = None
         self.target_angle = None
@@ -108,9 +108,9 @@ class RobotClient:
             return
         
         # Adjust base duty based on distance
-        self.controller.base_duty = 40
+        self.controller.base_duty = 30
         if distance > 300.0:
-            self.controller.base_duty = 60
+            self.controller.base_duty = 40
         
         if theta < 1e-6:
             current_angle = 0.0
@@ -131,14 +131,7 @@ class RobotClient:
         if distance > 100:  
             print("duty_l={:.0f} duty_r={:.0f} d={:.0f}mm".format(self.controller.duty_l,self.controller.duty_r, distance))
 
-    @staticmethod
-    def _normalize_angle(angle):
-        """Normalize angle to [-pi, pi]."""
-        while angle > math.pi:
-            angle -= 2 * math.pi
-        while angle < -math.pi:
-            angle += 2 * math.pi
-        return angle
+
     
     async def get_status(self):
         """Fetch connection status from server."""

@@ -15,12 +15,12 @@ class SlaveController:
     - If measured wheel speeds are provided to `update()` it runs PID correction.
     """
 
-    def __init__(self, kp=1.1, ki=0.1, kd=0.6, vMode=3):
+    def __init__(self, kp=1.1, ki=0.0, kd=0.6, vMode=3):
         self.v_max = rk.speeds[4]
         self.max_duty = rk.duty_list[4] 
         self.rd = MotorDriver(self.max_duty)
         # per-wheel PIDs
-        self.motor_pid = PID(kp, ki, kd, out_min=0, out_max=50.0)
+        self.motor_pid = PID(kp, ki, kd, out_min=-50, out_max=50.0)
         self.base_duty = 40 
         self.delta_error = 0.0
         self._last_time = None
