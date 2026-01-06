@@ -24,7 +24,7 @@ class RobotClient:
     """Integrated robot client with WebSocket communication and motor control."""
     
     def __init__(self):
-        self.controller = SlaveController(kp=1.2, ki=0.0, kd=0.6, vMode=3)
+        self.controller = SlaveController(kp=1.2, ki=0.0, kd=0.5, vMode=3)
         self.marker_id = None
         self.target_position = None
         self.target_angle = None
@@ -86,11 +86,11 @@ class RobotClient:
     async def _calculate_and_apply_control(self, robot: Robot):
         """Calculate motor velocities based on position and target using rotation vectors."""
         if robot.follow_point_world is None:
-            self.controller.set_target_duty(30.0, 0.0)
+            self.controller.set_target_duty(0.0, 0.0)
             return
         
         if not robot.detected:
-            self.controller.set_target_duty(30.0, 0.0)
+            self.controller.set_target_duty(40.0, 0.0)
             return
         
         # Convert inputs to numpy arrays (минимизируем создание массивов)
