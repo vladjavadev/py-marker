@@ -250,6 +250,9 @@ def detect_markers():
             continue
 
         corners, ids, rejected = aruco.detectMarkers(frame, ARUCO_DICT)
+        
+        for i in robot_dto_dict.values():
+            i.detected = False
 
 
         # estimate pose of each marker and return the values rvec and tvec---different from camera coefficients
@@ -294,7 +297,9 @@ def detect_markers():
                 robot.pos_px = current_robot_pos_px
                 robot.dir = current_direction.tolist()
                 robot.target_dir = direction_to_target.tolist()
+                robot.detected = True
                 robot_record.append(robot.to_json())
+
                 
                 
             print_counter=(print_counter+1)%30

@@ -14,6 +14,7 @@ class Robot:
 
         self.pos_world=[]
         self.follow_point_world = None
+        self.detected = False
 
     def __repr__(self):
         return (f"Robot("

@@ -87,10 +87,12 @@ async def echo(websocket:ServerConnection):
                         "target_pos_px":updated_robot.target_pos_px,
                         "dir":updated_robot.dir,
                         "target_dir":updated_robot.target_dir,
+                        "detected":updated_robot.detected
                         }
                     }
 
-                await websocket.send(json.dumps(msg))    
+                await websocket.send(json.dumps(msg))
+
    
     # assert event["type"] == "start"
     if event["type"] == "init-marker":
