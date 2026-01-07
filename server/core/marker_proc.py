@@ -358,11 +358,11 @@ def detect_markers():
                         tuple(follower_img[0][0].astype(int) + np.array([-50, -15])),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
-        if print_counter==0:
-            cv2.imshow("result", frame)
-            cv2.setWindowProperty("result", cv2.WND_PROP_TOPMOST, 1)
+        # if print_counter==0:
+        cv2.imshow("result", frame)
+        cv2.setWindowProperty("result", cv2.WND_PROP_TOPMOST, 1)
 
-            print(f"Time: {time.time()-start:.4f} сек")
+        print(f"Time: {time.time()-start:.4f} сек")
         if cv2.waitKey(1) == ord('q'):
             break
 
