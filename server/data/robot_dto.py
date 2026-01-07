@@ -24,7 +24,7 @@ class Robot:
                 f"dir={self.dir}, "
                 f"target_dir={self.target_dir}, "
                 f"pos_world={self.pos_world}, "
-                f"follow_point_world={self.follow_point_world.pos: if self.follow_point_world else None}"
+                f"follow_point_world={self.follow_point_world.pos if self.follow_point_world else None}"
                 f")")
     
     def to_dict(self):

@@ -61,7 +61,7 @@ def preprocess_img(img):
 
  
 def wait_clients():
-    unit = 40
+    unit = 10
     start_time = time.time() 
     wait_time = 0
 
@@ -226,6 +226,8 @@ def detect_markers():
     robot_delta_dict[2] = []
     robot_delta_dict[3] = []
     #run detection loop
+    robot_record = []
+
     while s_state.run_detection:
         time.sleep(0.1)
         start = time.time()
@@ -245,7 +247,6 @@ def detect_markers():
         # estimate pose of each marker and return the values rvec and tvec---different from camera coefficients
         if ids is not None:
             rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(corners, 0.05, camera_matrix, dist_coeffs)
-            robot_record = []
             for i in range(len(ids)):
                 marker_id = int(ids[i][0])
                 if ids[i][0] not in  robot_dto_dict:
@@ -278,26 +279,25 @@ def detect_markers():
                 # direction vector to the target point
                 theta, distance, current_direction, direction_to_target = \
                     calculate_angle_and_distance(R_marker, tvec, P_target)
-                
-                cur_delta_list = robot_delta_dict[marker_id]
-                cur_delta_list.append(error_x)  
+                if marker_id in robot_delta_dict and s_state.status=='hold-on-pos':
+                    cur_delta_list = robot_delta_dict[marker_id]
+                    cur_delta_list.append(error_x)  
                 # Update robot DTO
                 robot.pos_world = tvec.tolist()
                 robot.pos_px = current_robot_pos_px
                 robot.dir = current_direction.tolist()
                 robot.target_dir = direction_to_target.tolist()
                 robot.detected = True
-                robot_record.append(robot)
 
                 
                 
-            print_counter=(print_counter+1)%30
-            json_append_counter=(json_append_counter+1)%10
+                json_append_counter=(json_append_counter+1)%20
 
-            if json_append_counter==0:
-                robot_json_data.append(robot_record)
+                if json_append_counter==0 and s_state.status=='hold-on-pos':
+                    robot_record.append(robot)
+
     print("+++robot_data")
-    for i in robot_json_data:
+    for i in robot_record:
         print(i)
     for i in robot_delta_dict:
         print("+++marker_id :",i)
