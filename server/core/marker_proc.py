@@ -112,6 +112,7 @@ def init():
 
         time.sleep(0.1)
         print(f"wait show marker Time: {time.time()-start:.4f} sec")
+    
 
     print("waiting clients...")
     s_state.status = "wait-clients"
@@ -291,10 +292,79 @@ def detect_markers():
 
                 
                 
-                json_append_counter=(json_append_counter+1)%20
+                json_append_counter=(json_append_counter+1)%5
 
                 if json_append_counter==0 and s_state.status=='hold-on-pos':
                     robot_record.append(robot)
+
+                    target_img_point, _ = cv2.projectPoints(
+                    P_target.reshape(1, 3), 
+                    np.zeros((3,1)), 
+                    np.zeros((3,1)), 
+                    camera_matrix, 
+                    dist_coeffs
+                )
+                
+                cv2.circle(frame, 
+                        tuple(target_img_point[0][0].astype(int)), 
+                        10, (255, 255, 0), -1)  # Голубая точка
+                cv2.putText(frame, "FOLLOW TARGET", 
+                        tuple(target_img_point[0][0].astype(int) + np.array([15, -10])),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+                
+                # Визуализация P_target (точка для ориентации - фиолетовая)
+                p_target_img, _ = cv2.projectPoints(
+                    P_target.reshape(1, 3), 
+                    np.zeros((3,1)), 
+                    np.zeros((3,1)), 
+                    camera_matrix, 
+                    dist_coeffs
+                )
+                
+                cv2.circle(frame, 
+                        tuple(p_target_img[0][0].astype(int)), 
+                        8, (255, 0, 255), -1)  # Фиолетовая точка
+                cv2.putText(frame, "ORIENT TARGET", 
+                        tuple(p_target_img[0][0].astype(int) + np.array([15, 10])),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
+                
+                dist_mm = distance*1000
+                cv2.putText(
+                    frame,
+                    f"dist: {dist_mm:.2f}",   # обрезаем до 2 знаков после запятой
+                    tuple(p_target_img[0][0].astype(int) + np.array([15, 100])),     # позиция текста: слева внизу
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (255, 0, 255),
+                    2
+                )
+
+
+                # Стрелка от ведомого к целевой позиции следования
+                follower_img, _ = cv2.projectPoints(
+                    tvecs[i][0].reshape(1, 3), 
+                    np.zeros((3,1)), 
+                    np.zeros((3,1)), 
+                    camera_matrix, 
+                    dist_coeffs
+                )
+                cv2.arrowedLine(frame, 
+                            tuple(follower_img[0][0].astype(int)),
+                            tuple(target_img_point[0][0].astype(int)),
+                            (0, 255, 255), 2, tipLength=0.3)
+                
+                # Информация на изображении
+                cv2.putText(frame, f"ID: {ids[i][0]}", 
+                        tuple(follower_img[0][0].astype(int) + np.array([-50, -15])),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+
+        if print_counter==0:
+            cv2.imshow("result", frame)
+            cv2.setWindowProperty("result", cv2.WND_PROP_TOPMOST, 1)
+
+            print(f"Time: {time.time()-start:.4f} сек")
+        if cv2.waitKey(1) == ord('q'):
+            break
 
     print("+++robot_data")
     for i in robot_record:
