@@ -236,7 +236,8 @@ def detect_markers():
         ret, img = read_img()
         if not ret:
             continue
-        frame = preprocess_img(img)
+        # frame = preprocess_img(img)
+        frame = img
 
 
         corners, ids, rejected = aruco.detectMarkers(frame, ARUCO_DICT)
