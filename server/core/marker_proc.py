@@ -297,7 +297,7 @@ def detect_markers():
                 if json_append_counter==0 and s_state.status=='hold-on-pos':
                     robot_record.append(robot)
 
-                    target_img_point, _ = cv2.projectPoints(
+                target_img_point, _ = cv2.projectPoints(
                     P_target.reshape(1, 3), 
                     np.zeros((3,1)), 
                     np.zeros((3,1)), 
