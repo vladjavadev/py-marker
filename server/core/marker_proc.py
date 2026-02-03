@@ -1,3 +1,4 @@
+import dis
 from turtle import title
 import cv2
 import cv2.aruco as aruco
@@ -281,7 +282,9 @@ def detect_markers():
                 # direction vector to the target point
                 theta, distance, current_direction, direction_to_target = \
                     calculate_angle_and_distance(R_marker, tvec, P_target)
-                if marker_id in robot_delta_dict and s_state.status=='hold-on-pos':
+                json_append_counter=(json_append_counter+1)%4
+                
+                if marker_id in robot_delta_dict and json_append_counter==0:
                     cur_delta_list = robot_delta_dict[marker_id]
                     cur_delta_list.append(error_x)  
                 # Update robot DTO
@@ -293,7 +296,6 @@ def detect_markers():
 
                 
                 
-                json_append_counter=(json_append_counter+1)%5
 
                 if json_append_counter==0 and s_state.status=='hold-on-pos':
                     robot_record.append(robot)
@@ -309,7 +311,7 @@ def detect_markers():
                 cv2.circle(frame, 
                         tuple(target_img_point[0][0].astype(int)), 
                         10, (255, 255, 0), -1)  # Голубая точка
-                cv2.putText(frame, "FOLLOW TARGET", 
+                cv2.putText(frame, "fw-point", 
                         tuple(target_img_point[0][0].astype(int) + np.array([15, -10])),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
                 
@@ -322,21 +324,14 @@ def detect_markers():
                     dist_coeffs
                 )
                 
-                cv2.circle(frame, 
-                        tuple(p_target_img[0][0].astype(int)), 
-                        8, (255, 0, 255), -1)  # Фиолетовая точка
-                cv2.putText(frame, "ORIENT TARGET", 
-                        tuple(p_target_img[0][0].astype(int) + np.array([15, 10])),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
                 
-                dist_mm = distance*1000
                 cv2.putText(
                     frame,
-                    f"dist: {dist_mm:.2f}",   # обрезаем до 2 знаков после запятой
-                    tuple(p_target_img[0][0].astype(int) + np.array([15, 100])),     # позиция текста: слева внизу
+                    f"Distance: {distance:.2f}",   # обрезаем до 2 знаков после запятой
+                    tuple(p_target_img[0][0].astype(int) + np.array([-15, -20])),     # позиция текста: слева внизу
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
-                    (255, 0, 255),
+                    (0, 255, 0),
                     2
                 )
 
@@ -352,12 +347,12 @@ def detect_markers():
                 cv2.arrowedLine(frame, 
                             tuple(follower_img[0][0].astype(int)),
                             tuple(target_img_point[0][0].astype(int)),
-                            (0, 255, 255), 2, tipLength=0.3)
+                            (0, 255, 0), 2, tipLength=0.3)
                 
                 # Информация на изображении
                 cv2.putText(frame, f"ID: {ids[i][0]}", 
-                        tuple(follower_img[0][0].astype(int) + np.array([-50, -15])),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                        tuple(follower_img[0][0].astype(int) + np.array([50, -40])),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
 
         # if print_counter==0:
         cv2.imshow("result", frame)
@@ -367,9 +362,9 @@ def detect_markers():
         if cv2.waitKey(1) == ord('q'):
             break
 
-    print("+++robot_data")
-    for i in robot_record:
-        print(i)
+    # print("+++robot_data")
+    # for i in robot_record:
+    #     print(i)
     for i in robot_delta_dict:
         print("+++marker_id :",i)
         for el in robot_delta_dict[i]:
